@@ -350,12 +350,13 @@ export default function App() {
               onSend={sendMessage}
               showBack={isMobileView && !!activeContact}
               onBack={() => setActiveContact(null)}
+              feedback={feedback}
             />
           </section>
         </section>
       )}
 
-      {feedback ? <p className="feedback">{feedback}</p> : null}
+      {!identity && feedback ? <p className="feedback">{feedback}</p> : null}
     </main>
   );
 }

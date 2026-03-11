@@ -1,6 +1,14 @@
 import { useState } from "react";
 
-export function ChatWindow({ contact, connectionState, messages, onSend, showBack = false, onBack = null }) {
+export function ChatWindow({
+  contact,
+  connectionState,
+  messages,
+  onSend,
+  showBack = false,
+  onBack = null,
+  feedback = ""
+}) {
   const [text, setText] = useState("");
 
   if (!contact) {
@@ -21,6 +29,7 @@ export function ChatWindow({ contact, connectionState, messages, onSend, showBac
           <h3>{contact.alias || contact.display_name}</h3>
           <p className="muted expire-label">messages expire in 12h</p>
         </div>
+        {feedback ? <p className="header-feedback">{feedback}</p> : null}
         <div className="chat-header-actions">
           <span className={`status-pill ${connectionState === "connected" ? "online" : ""}`}>
             <span className={`dot ${connectionState === "connected" ? "green" : "red"}`} />
