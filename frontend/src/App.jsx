@@ -29,7 +29,7 @@ export default function App() {
   const [connectionState, setConnectionState] = useState("disconnected");
   const [presenceByUserId, setPresenceByUserId] = useState({});
   const [feedback, setFeedback] = useState("");
-  const [isMobileView, setIsMobileView] = useState(() => window.innerWidth <= 1080);
+  const [activeScreen, setActiveScreen] = useState("contacts");
   const connectionStateRef = useRef("disconnected");
   const p2pRef = useRef(null);
   const [inviteToken, setInviteToken] = useState(() => localStorage.getItem(INVITE_TOKEN_STORAGE_KEY) || "");
@@ -54,14 +54,6 @@ export default function App() {
     const nextQuery = params.toString();
     const nextUrl = `${window.location.pathname}${nextQuery ? `?${nextQuery}` : ""}`;
     window.history.replaceState({}, "", nextUrl);
-  }, []);
-
-  useEffect(() => {
-    function handleResize() {
-      setIsMobileView(window.innerWidth <= 1080);
-    }
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
   }, []);
 
   useEffect(() => {
@@ -101,6 +93,7 @@ export default function App() {
       const payload = { username: username.trim(), password };
       const user = authMode === "signup" ? await apiClient.signup(payload) : await apiClient.login(payload);
       setIdentity(user);
+      setActiveScreen("contacts");
       setFeedback(authMode === "signup" ? "Account created. Share your QR code." : "Logged in.");
       await refreshContactsAndPending(user.id);
     } catch (error) {
@@ -272,6 +265,7 @@ export default function App() {
     setIdentity(null);
     setActiveContact(null);
     setConnectionState("disconnected");
+    setActiveScreen("contacts");
     setFeedback("Logged out.");
   }
 
@@ -322,62 +316,106 @@ export default function App() {
           </div>
         </section>
       ) : (
-        <section className="chat-layout">
-          <aside className={`sidebar ${isMobileView && activeContact ? "hidden-mobile" : ""}`}>
-            <div className="sidebar-header">
-              <div>
-                <h2>WhisperTalk</h2>
-                <p className="identity-line">$ {identity.username}_</p>
-              </div>
-              <button className="btn small ghost" onClick={logout}>
-                Logout
-              </button>
-            </div>
+        <section className="mobile-app-shell">
+          {activeScreen === "contacts" ? (
+            <section className="contacts-screen">
+              <header className="contacts-header">
+                <div className="brand-inline">
+                  <span className="brand-icon">◯</span>
+                  <h2>WhisperTalk</h2>
+                </div>
+                <div className="contacts-header-actions">
+                  <button className="icon-action" onClick={() => setActiveScreen("settings")} aria-label="Open settings">
+                    ⚙
+                  </button>
+                </div>
+              </header>
 
-            <ContactList
-              contacts={contacts}
-              activeContactId={activeContact?.contact_user_id}
-              onSelect={setActiveContact}
-              presenceByUserId={presenceByUserId}
-            />
+              <div className="contacts-identity">$ {identity.username}</div>
+              <ContactList
+                contacts={contacts}
+                activeContactId={activeContact?.contact_user_id}
+                onSelect={(contact) => {
+                  setActiveContact(contact);
+                  setActiveScreen("chat");
+                }}
+                presenceByUserId={presenceByUserId}
+              />
 
-            <section className="panel pending-panel">
-              <h3>Pending Requests</h3>
-              {pending.length === 0 ? (
-                <p className="muted">No pending requests.</p>
-              ) : (
-                pending.map((request) => (
-                  <div key={request.id} className="row">
-                    <span className="mono">{request.requester_id.slice(0, 8)}...</span>
-                    <button className="btn small" onClick={() => acceptRequest(request.id)}>
-                      Accept
-                    </button>
-                  </div>
-                ))
-              )}
+              <section className="panel pending-panel">
+                <h3>Pending Requests</h3>
+                {pending.length === 0 ? (
+                  <p className="muted">No pending requests.</p>
+                ) : (
+                  pending.map((request) => (
+                    <div key={request.id} className="row">
+                      <span className="mono">{request.requester_id.slice(0, 8)}...</span>
+                      <button className="btn small" onClick={() => acceptRequest(request.id)}>
+                        Accept
+                      </button>
+                    </div>
+                  ))
+                )}
+              </section>
+
+              <footer className="screen-footer">
+                <span className="sidebar-footnote">E2E ENCRYPTED • P2P</span>
+                <button className="icon-action" onClick={() => setActiveScreen("settings")} aria-label="Open settings">
+                  ⚙
+                </button>
+              </footer>
             </section>
+          ) : null}
 
-            <QRCodeCard user={identity} />
-            <ScanAddContact
-              userId={identity.id}
-              onSubmit={sendContactRequest}
-              initialInviteValue={inviteToken}
-            />
-            <p className="sidebar-footnote">E2E ENCRYPTED • P2P</p>
-          </aside>
+          {activeScreen === "chat" ? (
+            <section className="chat-screen">
+              <ChatWindow
+                contact={activeContact}
+                connectionState={connectionState}
+                peerOnline={activePeerOnline}
+                messages={messages}
+                onSend={sendMessage}
+                showBack={true}
+                onBack={() => setActiveScreen("contacts")}
+                feedback={feedback}
+              />
+            </section>
+          ) : null}
 
-          <section className={`chat-pane ${isMobileView && !activeContact ? "hidden-mobile" : ""}`}>
-            <ChatWindow
-              contact={activeContact}
-              connectionState={connectionState}
-              peerOnline={activePeerOnline}
-              messages={messages}
-              onSend={sendMessage}
-              showBack={isMobileView && !!activeContact}
-              onBack={() => setActiveContact(null)}
-              feedback={feedback}
-            />
-          </section>
+          {activeScreen === "settings" ? (
+            <section className="settings-screen">
+              <header className="settings-header">
+                <button className="icon-action back-arrow" onClick={() => setActiveScreen("contacts")} aria-label="Back to contacts">
+                  ←
+                </button>
+                <h2>SETTINGS</h2>
+              </header>
+
+              <section className="panel settings-identity-card">
+                <h3>Username</h3>
+                <div className="settings-identity-row">
+                  <strong>{identity.username}</strong>
+                </div>
+              </section>
+
+              <QRCodeCard user={identity} />
+              <ScanAddContact userId={identity.id} onSubmit={sendContactRequest} initialInviteValue={inviteToken} />
+
+              <section className="panel settings-actions-card">
+                <button className="btn ghost full-width-btn" onClick={logout}>
+                  Sign Out
+                </button>
+              </section>
+
+              <section className="panel danger-panel">
+                <h3>Danger Zone</h3>
+                <p className="muted">This action is not available in this build.</p>
+                <button className="btn danger-btn full-width-btn" disabled>
+                  Clear All Data
+                </button>
+              </section>
+            </section>
+          ) : null}
         </section>
       )}
 

@@ -19,6 +19,15 @@ export function QRCodeCard({ user }) {
     }
   }
 
+  async function copyUserId() {
+    try {
+      await navigator.clipboard.writeText(user.id);
+      setShareStatus("User ID copied.");
+    } catch (_) {
+      setShareStatus("Could not copy user ID.");
+    }
+  }
+
   async function shareInviteLink() {
     if (!navigator.share) {
       setShareStatus("Native share is not available.");
@@ -33,15 +42,17 @@ export function QRCodeCard({ user }) {
   }
 
   return (
-    <section className="panel">
-      <h3>Your QR Code</h3>
-      <p className="muted">Share this QR code to let someone add you.</p>
+    <section className="panel identity-panel">
+      <h3>Your Identity</h3>
       <div className="qr-wrap">
         <QRCodeCanvas value={qrPayload} size={168} includeMargin />
       </div>
-      <code className="mono">ID: {user.id.slice(0, 12)}...</code>
-      <code className="mono invite-link">{inviteLink}</code>
+      <p className="muted">Share this QR code to let someone add you</p>
+      <code className="mono full-id">{user.id}</code>
       <div className="invite-actions">
+        <button className="btn small ghost" onClick={copyUserId}>
+          Copy User ID
+        </button>
         <button className="btn small ghost" onClick={copyInviteLink}>
           Copy Invite Link
         </button>
@@ -49,6 +60,7 @@ export function QRCodeCard({ user }) {
           Share
         </button>
       </div>
+      <code className="mono invite-link">{inviteLink}</code>
       {shareStatus ? <p className="muted share-status">{shareStatus}</p> : null}
     </section>
   );

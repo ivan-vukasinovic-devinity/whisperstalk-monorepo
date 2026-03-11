@@ -30,9 +30,16 @@ export function ChatWindow({
   return (
     <section className="panel chat-window">
       <div className="chat-header">
-        <div>
-          <h3>{contact.alias || contact.display_name}</h3>
-          <p className="muted expire-label">messages expire in 12h</p>
+        <div className="chat-title-wrap">
+          {showBack && onBack ? (
+            <button className="icon-action back-arrow" onClick={onBack} aria-label="Back">
+              ←
+            </button>
+          ) : null}
+          <div>
+            <h3>{contact.alias || contact.display_name}</h3>
+            <p className="muted expire-label">messages expire in 12h</p>
+          </div>
         </div>
         {feedback ? <p className="header-feedback">{feedback}</p> : null}
         <div className="chat-header-actions">
@@ -40,11 +47,9 @@ export function ChatWindow({
             <span className={`dot ${statusDotClass}`} />
             {statusLabel}
           </span>
-          {showBack && onBack ? (
-            <button className="btn small ghost back-btn" onClick={onBack}>
-              Back
-            </button>
-          ) : null}
+          <button className="icon-action delete-icon" disabled aria-label="Delete chat">
+            🗑
+          </button>
         </div>
       </div>
       <div className="messages">
@@ -70,7 +75,7 @@ export function ChatWindow({
         <input
           className="text-input composer-input"
           value={text}
-          placeholder="Type message..."
+          placeholder="type a message..."
           onChange={(event) => setText(event.target.value)}
         />
         <button
@@ -81,7 +86,7 @@ export function ChatWindow({
             setText("");
           }}
         >
-          Send
+          ➤
         </button>
       </div>
     </section>
