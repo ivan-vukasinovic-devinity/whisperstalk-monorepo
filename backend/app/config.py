@@ -19,11 +19,16 @@ class Settings(BaseSettings):
     def normalize_database_url(cls, value: str) -> str:
         if not isinstance(value, str):
             return value
-        if value.startswith("postgres://"):
-            return value.replace("postgres://", "postgresql+psycopg2://", 1)
-        if value.startswith("postgresql://"):
-            return value.replace("postgresql://", "postgresql+psycopg2://", 1)
-        return value
+        cleaned = value.strip()
+        if (cleaned.startswith("'") and cleaned.endswith("'")) or (
+            cleaned.startswith('"') and cleaned.endswith('"')
+        ):
+            cleaned = cleaned[1:-1].strip()
+        if cleaned.startswith("postgres://"):
+            return cleaned.replace("postgres://", "postgresql+psycopg2://", 1)
+        if cleaned.startswith("postgresql://"):
+            return cleaned.replace("postgresql://", "postgresql+psycopg2://", 1)
+        return cleaned
 
     @property
     def cors_origins_list(self) -> list[str]:
