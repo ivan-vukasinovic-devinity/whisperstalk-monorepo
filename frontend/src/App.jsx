@@ -31,6 +31,7 @@ export default function App() {
   const [feedback, setFeedback] = useState("");
   const [activeScreen, setActiveScreen] = useState("contacts");
   const connectionStateRef = useRef("disconnected");
+  const activePeerOnlineRef = useRef(false);
   const p2pRef = useRef(null);
   const [inviteToken, setInviteToken] = useState(() => localStorage.getItem(INVITE_TOKEN_STORAGE_KEY) || "");
 
@@ -151,6 +152,10 @@ export default function App() {
   }, [identity, inviteToken]);
 
   useEffect(() => {
+    activePeerOnlineRef.current = activePeerOnline;
+  }, [activePeerOnline]);
+
+  useEffect(() => {
     if (!identity || !activeContact) return;
     setConnectionState("connecting");
     connectionStateRef.current = "connecting";
@@ -194,7 +199,7 @@ export default function App() {
 
     const renegotiateId = setInterval(() => {
       if (!initiator) return;
-      if (!activePeerOnline) return;
+      if (!activePeerOnlineRef.current) return;
       if (connectionStateRef.current === "connected") return;
       session.startOffer({ iceRestart: true }).catch(() => {});
     }, 5000);
@@ -209,7 +214,7 @@ export default function App() {
       setConnectionState("disconnected");
       connectionStateRef.current = "disconnected";
     };
-  }, [identity, activeContact, addMessage, activePeerOnline]);
+  }, [identity, activeContact, addMessage]);
 
   useEffect(() => {
     if (!activeContact || connectionState !== "connected" || !p2pRef.current) return;

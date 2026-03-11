@@ -4,7 +4,7 @@ function buildIceServers() {
   const stunUrl = import.meta.env.VITE_STUN_URL || "stun:stun.l.google.com:19302";
   const turnUrls =
     import.meta.env.VITE_TURN_URL ||
-    "turn:openrelay.metered.ca:80?transport=udp,turn:openrelay.metered.ca:80?transport=tcp";
+    "turn:openrelay.metered.ca:80?transport=udp,turn:openrelay.metered.ca:80?transport=tcp,turn:openrelay.metered.ca:443?transport=tcp,turns:openrelay.metered.ca:443?transport=tcp";
   const turnUsername = import.meta.env.VITE_TURN_USERNAME || "openrelayproject";
   const turnCredential = import.meta.env.VITE_TURN_CREDENTIAL || "openrelayproject";
 
