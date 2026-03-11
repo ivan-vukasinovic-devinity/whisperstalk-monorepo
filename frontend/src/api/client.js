@@ -31,6 +31,17 @@ export const apiClient = {
   getPendingRequests(userId) {
     return request(`/contacts/requests/pending/${userId}`);
   },
+  heartbeat(userId) {
+    return request("/presence/heartbeat", {
+      method: "POST",
+      body: JSON.stringify({ user_id: userId })
+    });
+  },
+  getPresenceStatuses(userIds) {
+    if (!userIds?.length) return Promise.resolve([]);
+    const query = encodeURIComponent(userIds.join(","));
+    return request(`/presence/statuses?user_ids=${query}`);
+  },
   createContactRequest(payload) {
     return request("/contacts/requests", { method: "POST", body: JSON.stringify(payload) });
   },

@@ -27,7 +27,7 @@ export function ScanAddContact({ userId, onSubmit, disabled, initialInviteValue 
   const token = useMemo(() => extractToken(value), [value]);
 
   useEffect(() => {
-    if (initialInviteValue && !value) {
+    if (initialInviteValue && initialInviteValue !== value) {
       setValue(initialInviteValue);
     }
   }, [initialInviteValue, value]);

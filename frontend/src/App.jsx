@@ -8,8 +8,18 @@ import { ScanAddContact } from "./components/ScanAddContact";
 import { useEphemeralMessages } from "./hooks/useEphemeralMessages";
 import { createP2PSession } from "./p2p/webrtc";
 
+const SESSION_STORAGE_KEY = "whispers_identity";
+const INVITE_TOKEN_STORAGE_KEY = "whispers_pending_invite_token";
+
 export default function App() {
-  const [identity, setIdentity] = useState(null);
+  const [identity, setIdentity] = useState(() => {
+    try {
+      const raw = localStorage.getItem(SESSION_STORAGE_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch (_) {
+      return null;
+    }
+  });
   const [authMode, setAuthMode] = useState("signup");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -17,20 +27,48 @@ export default function App() {
   const [pending, setPending] = useState([]);
   const [activeContact, setActiveContact] = useState(null);
   const [connectionState, setConnectionState] = useState("disconnected");
+  const [presenceByUserId, setPresenceByUserId] = useState({});
   const [feedback, setFeedback] = useState("");
+  const [isMobileView, setIsMobileView] = useState(() => window.innerWidth <= 1080);
   const p2pRef = useRef(null);
-  const inviteTokenFromUrl = useMemo(() => {
-    if (typeof window === "undefined") return "";
-    const params = new URLSearchParams(window.location.search);
-    return params.get("inviteToken") || params.get("token") || "";
-  }, []);
+  const [inviteToken, setInviteToken] = useState(() => localStorage.getItem(INVITE_TOKEN_STORAGE_KEY) || "");
 
   const conversationKey = useMemo(() => {
     if (!identity || !activeContact) return null;
     return [identity.id, activeContact.contact_user_id].sort().join("_");
   }, [identity, activeContact]);
 
-  const { messages, addMessage } = useEphemeralMessages(conversationKey);
+  const { messages, addMessage, updateMessage } = useEphemeralMessages(conversationKey);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tokenFromUrl = params.get("inviteToken") || params.get("token") || "";
+    if (!tokenFromUrl) return;
+
+    setInviteToken(tokenFromUrl);
+    localStorage.setItem(INVITE_TOKEN_STORAGE_KEY, tokenFromUrl);
+    params.delete("inviteToken");
+    params.delete("token");
+    const nextQuery = params.toString();
+    const nextUrl = `${window.location.pathname}${nextQuery ? `?${nextQuery}` : ""}`;
+    window.history.replaceState({}, "", nextUrl);
+  }, []);
+
+  useEffect(() => {
+    function handleResize() {
+      setIsMobileView(window.innerWidth <= 1080);
+    }
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  useEffect(() => {
+    if (!identity) {
+      localStorage.removeItem(SESSION_STORAGE_KEY);
+      return;
+    }
+    localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(identity));
+  }, [identity]);
 
   async function refreshContactsAndPending(userId) {
     const [contactsData, pendingData] = await Promise.all([
@@ -39,6 +77,21 @@ export default function App() {
     ]);
     setContacts(contactsData);
     setPending(pendingData);
+    if (contactsData.length === 0) {
+      setPresenceByUserId({});
+      return;
+    }
+    try {
+      const statuses = await apiClient.getPresenceStatuses(contactsData.map((item) => item.contact_user_id));
+      setPresenceByUserId(
+        statuses.reduce((acc, item) => {
+          acc[item.user_id] = item.is_online;
+          return acc;
+        }, {})
+      );
+    } catch (_) {
+      // Presence indicators are best effort and should not block primary data loading.
+    }
   }
 
   async function authenticate() {
@@ -58,6 +111,10 @@ export default function App() {
     try {
       await apiClient.createContactRequest({ requester_id: identity.id, target_qr_token: token });
       setFeedback("Contact request sent.");
+      if (inviteToken && token === inviteToken) {
+        setInviteToken("");
+        localStorage.removeItem(INVITE_TOKEN_STORAGE_KEY);
+      }
     } catch (error) {
       setFeedback(error.message);
     }
@@ -81,10 +138,18 @@ export default function App() {
   }, [identity]);
 
   useEffect(() => {
-    if (identity && inviteTokenFromUrl) {
+    if (!identity) return undefined;
+    const run = () => apiClient.heartbeat(identity.id).catch(() => {});
+    run();
+    const id = setInterval(run, 4000);
+    return () => clearInterval(id);
+  }, [identity]);
+
+  useEffect(() => {
+    if (identity && inviteToken) {
       setFeedback("Invite link detected. Review token in Add Contact and send request.");
     }
-  }, [identity, inviteTokenFromUrl]);
+  }, [identity, inviteToken]);
 
   useEffect(() => {
     if (!identity || !activeContact) return;
@@ -133,17 +198,57 @@ export default function App() {
     };
   }, [identity, activeContact, addMessage]);
 
+  useEffect(() => {
+    if (!activeContact || connectionState !== "connected" || !p2pRef.current) return;
+    const unsentMine = messages
+      .filter((item) => item.me && item.status === "sending")
+      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+
+    for (const message of unsentMine) {
+      try {
+        p2pRef.current.sendText(message.text);
+        updateMessage(message.id, {
+          status: "sent",
+          sentAt: new Date().toISOString()
+        });
+      } catch (_) {
+        break;
+      }
+    }
+  }, [activeContact, connectionState, messages, updateMessage]);
+
   function sendMessage(text) {
-    if (!p2pRef.current) {
-      setFeedback("Not connected to peer yet.");
-      return;
+    if (!activeContact) return;
+    const messageId = crypto.randomUUID();
+    addMessage({
+      id: messageId,
+      text,
+      me: true,
+      createdAt: new Date().toISOString(),
+      status: "sending",
+      sentAt: null
+    });
+
+    if (p2pRef.current && connectionState === "connected") {
+      try {
+        p2pRef.current.sendText(text);
+        updateMessage(messageId, {
+          status: "sent",
+          sentAt: new Date().toISOString()
+        });
+      } catch (_) {
+        setFeedback("Peer is offline. Message queued and will send on reconnect.");
+      }
+    } else {
+      setFeedback("Peer is offline. Message queued and will send on reconnect.");
     }
-    try {
-      p2pRef.current.sendText(text);
-      addMessage({ id: crypto.randomUUID(), text, me: true, createdAt: new Date().toISOString() });
-    } catch (error) {
-      setFeedback(error.message);
-    }
+  }
+
+  function logout() {
+    setIdentity(null);
+    setActiveContact(null);
+    setConnectionState("disconnected");
+    setFeedback("Logged out.");
   }
 
   return (
@@ -194,13 +299,13 @@ export default function App() {
         </section>
       ) : (
         <section className="chat-layout">
-          <aside className="sidebar">
+          <aside className={`sidebar ${isMobileView && activeContact ? "hidden-mobile" : ""}`}>
             <div className="sidebar-header">
               <div>
                 <h2>WhisperTalk</h2>
                 <p className="identity-line">$ {identity.username}_</p>
               </div>
-              <button className="btn small ghost" onClick={() => setIdentity(null)}>
+              <button className="btn small ghost" onClick={logout}>
                 Logout
               </button>
             </div>
@@ -209,6 +314,7 @@ export default function App() {
               contacts={contacts}
               activeContactId={activeContact?.contact_user_id}
               onSelect={setActiveContact}
+              presenceByUserId={presenceByUserId}
             />
 
             <section className="panel pending-panel">
@@ -231,17 +337,19 @@ export default function App() {
             <ScanAddContact
               userId={identity.id}
               onSubmit={sendContactRequest}
-              initialInviteValue={inviteTokenFromUrl}
+              initialInviteValue={inviteToken}
             />
             <p className="sidebar-footnote">E2E ENCRYPTED • P2P</p>
           </aside>
 
-          <section className="chat-pane">
+          <section className={`chat-pane ${isMobileView && !activeContact ? "hidden-mobile" : ""}`}>
             <ChatWindow
               contact={activeContact}
               connectionState={connectionState}
               messages={messages}
               onSend={sendMessage}
+              showBack={isMobileView && !!activeContact}
+              onBack={() => setActiveContact(null)}
             />
           </section>
         </section>

@@ -41,5 +41,17 @@ export function useEphemeralMessages(conversationKey) {
     setMessages((prev) => prune([...prev, message]));
   }, []);
 
-  return { messages, addMessage };
+  const updateMessage = useCallback((messageId, updater) => {
+    setMessages((prev) =>
+      prune(
+        prev.map((message) => {
+          if (message.id !== messageId) return message;
+          const nextPatch = typeof updater === "function" ? updater(message) : updater;
+          return { ...message, ...nextPatch };
+        })
+      )
+    );
+  }, []);
+
+  return { messages, addMessage, updateMessage };
 }

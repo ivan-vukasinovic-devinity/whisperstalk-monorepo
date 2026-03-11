@@ -154,6 +154,13 @@ body {
   font-weight: 600;
 }
 
+.contact-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
 .contact-preview {
   font-size: 12px;
   color: #95a0c2;
@@ -185,6 +192,12 @@ body {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 8px;
+}
+
+.chat-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .chat-header h3 {
@@ -299,6 +312,10 @@ body {
   padding: 10px 0;
 }
 
+.back-btn {
+  min-width: 62px;
+}
+
 .btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
@@ -311,6 +328,7 @@ body {
 .status-pill {
   display: inline-flex;
   align-items: center;
+  gap: 6px;
   border-radius: 999px;
   border: 1px solid #3b4461;
   background: #192036;
@@ -323,6 +341,23 @@ body {
 .status-pill.online {
   border-color: #2ecf8c;
   color: #9df6d0;
+}
+
+.dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  display: inline-block;
+}
+
+.dot.green {
+  background: #2ecf8c;
+  box-shadow: 0 0 0 2px rgba(46, 207, 140, 0.2);
+}
+
+.dot.red {
+  background: #ff5f6d;
+  box-shadow: 0 0 0 2px rgba(255, 95, 109, 0.2);
 }
 
 .muted {
@@ -401,9 +436,15 @@ body {
     grid-template-columns: 1fr;
   }
 
-  .sidebar,
   .chat-window {
-    max-height: unset;
-    height: auto;
+    height: calc(100vh - 36px);
+  }
+
+  .sidebar {
+    max-height: calc(100vh - 36px);
+  }
+
+  .hidden-mobile {
+    display: none;
   }
 }

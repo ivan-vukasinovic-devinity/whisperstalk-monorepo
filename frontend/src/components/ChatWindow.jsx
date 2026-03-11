@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-export function ChatWindow({ contact, connectionState, messages, onSend }) {
+export function ChatWindow({ contact, connectionState, messages, onSend, showBack = false, onBack = null }) {
   const [text, setText] = useState("");
 
   if (!contact) {
@@ -21,9 +21,17 @@ export function ChatWindow({ contact, connectionState, messages, onSend }) {
           <h3>{contact.alias || contact.display_name}</h3>
           <p className="muted expire-label">messages expire in 12h</p>
         </div>
-        <span className={`status-pill ${connectionState === "connected" ? "online" : ""}`}>
-          {connectionState || "disconnected"}
-        </span>
+        <div className="chat-header-actions">
+          <span className={`status-pill ${connectionState === "connected" ? "online" : ""}`}>
+            <span className={`dot ${connectionState === "connected" ? "green" : "red"}`} />
+            {connectionState === "connected" ? "connected" : "not connected"}
+          </span>
+          {showBack && onBack ? (
+            <button className="btn small ghost back-btn" onClick={onBack}>
+              Back
+            </button>
+          ) : null}
+        </div>
       </div>
       <div className="messages">
         {messages.length === 0 ? (
@@ -32,7 +40,13 @@ export function ChatWindow({ contact, connectionState, messages, onSend }) {
           messages.map((message) => (
             <div key={message.id} className={`bubble ${message.me ? "me" : "peer"}`}>
               <div>{message.text}</div>
-              <small>{new Date(message.createdAt).toLocaleTimeString()}</small>
+              <small>
+                {message.me
+                  ? message.status === "sending"
+                    ? "sending"
+                    : `sent · ${new Date(message.sentAt || message.createdAt).toLocaleTimeString()}`
+                  : new Date(message.createdAt).toLocaleTimeString()}
+              </small>
             </div>
           ))
         )}
