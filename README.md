@@ -36,6 +36,9 @@ uvicorn app.main:app --reload --port 8000
 Swagger/OpenAPI:
 - [http://localhost:8000/docs](http://localhost:8000/docs)
 
+Deployment (DigitalOcean):
+- See `backend/DEPLOY_DIGITALOCEAN.md`
+
 Key routes (all under `/api/v1`):
 - `POST /auth/signup` - create account with username/password
 - `POST /auth/login` - login with username/password

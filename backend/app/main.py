@@ -32,3 +32,8 @@ app.include_router(signaling_router, prefix=settings.api_v1_prefix)
 @app.get("/")
 def root() -> dict[str, str]:
     return {"message": "Whispers backend running"}
+
+
+@app.get("/health")
+def health() -> dict[str, str]:
+    return {"status": "ok"}

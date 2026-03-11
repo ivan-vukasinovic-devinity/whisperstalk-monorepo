@@ -1,0 +1,33 @@
+name: whisperstalk-monorepo
+region: fra
+services:
+  - name: backend
+    github:
+      repo: ivan-vukasinovic-devinity/whisperstalk-monorepo
+      branch: main
+      deploy_on_push: true
+    source_dir: /backend
+    dockerfile_path: /backend/Dockerfile
+    http_port: 8080
+    instance_count: 1
+    instance_size_slug: basic-xxs
+    envs:
+      - key: APP_NAME
+        scope: RUN_TIME
+        value: Whispers Backend
+      - key: API_V1_PREFIX
+        scope: RUN_TIME
+        value: /api/v1
+      - key: CORS_ORIGINS
+        scope: RUN_TIME
+        value: https://your-frontend-domain.com
+      - key: DATABASE_URL
+        scope: RUN_TIME
+        type: SECRET
+        value: ${db.DATABASE_URL}
+databases:
+  - name: db
+    engine: PG
+    num_nodes: 1
+    size: db-s-1vcpu-1gb
+    version: "16"
