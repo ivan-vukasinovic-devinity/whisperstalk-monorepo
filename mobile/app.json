@@ -1,0 +1,9 @@
+{
+  "expo": {
+    "name": "Whispers Mobile",
+    "slug": "whispers-mobile",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light"
+  }
+}
