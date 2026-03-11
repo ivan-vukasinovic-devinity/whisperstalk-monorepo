@@ -152,6 +152,30 @@ export default function App() {
   }, [identity, inviteToken]);
 
   useEffect(() => {
+    function setViewportHeight() {
+      const viewportHeight = window.visualViewport?.height || window.innerHeight;
+      const keyboardInset = window.visualViewport
+        ? Math.max(0, window.innerHeight - window.visualViewport.height - window.visualViewport.offsetTop)
+        : 0;
+      document.documentElement.style.setProperty("--app-vh", `${viewportHeight}px`);
+      document.documentElement.style.setProperty("--kb-inset", `${keyboardInset}px`);
+      document.documentElement.classList.toggle("keyboard-open", keyboardInset > 120);
+    }
+
+    setViewportHeight();
+    window.addEventListener("resize", setViewportHeight);
+    window.visualViewport?.addEventListener("resize", setViewportHeight);
+    window.visualViewport?.addEventListener("scroll", setViewportHeight);
+
+    return () => {
+      window.removeEventListener("resize", setViewportHeight);
+      window.visualViewport?.removeEventListener("resize", setViewportHeight);
+      window.visualViewport?.removeEventListener("scroll", setViewportHeight);
+      document.documentElement.classList.remove("keyboard-open");
+    };
+  }, []);
+
+  useEffect(() => {
     activePeerOnlineRef.current = activePeerOnline;
   }, [activePeerOnline]);
 
@@ -159,6 +183,8 @@ export default function App() {
     if (!identity || !activeContact) return;
     setConnectionState("connecting");
     connectionStateRef.current = "connecting";
+    let disposed = false;
+    let pollId;
 
     if (p2pRef.current) {
       p2pRef.current.destroy();
@@ -182,20 +208,32 @@ export default function App() {
     });
     p2pRef.current = session;
 
-    if (initiator) {
-      session.startOffer().catch((error) => setFeedback(error.message));
-    }
-
-    const pollId = setInterval(async () => {
+    async function bootstrapSession() {
+      // Old queued offers/candidates can poison renegotiation for long-lived user pairs.
+      // Drain stale pair-specific signaling once before starting a fresh session.
       try {
-        const inbox = await apiClient.consumeSignals(identity.id, remoteUserId);
-        for (const signal of inbox) {
-          await session.handleSignal(signal);
-        }
+        await apiClient.consumeSignals(identity.id, remoteUserId);
       } catch (_) {
-        // Silent polling retries keep reconnection simple for MVP.
+        // Keep going; periodic polling will still eventually recover.
       }
-    }, 1200);
+      if (disposed) return;
+
+      if (initiator) {
+        session.startOffer().catch((error) => setFeedback(error.message));
+      }
+
+      pollId = setInterval(async () => {
+        try {
+          const inbox = await apiClient.consumeSignals(identity.id, remoteUserId);
+          for (const signal of inbox) {
+            await session.handleSignal(signal);
+          }
+        } catch (_) {
+          // Silent polling retries keep reconnection simple for MVP.
+        }
+      }, 1200);
+    }
+    bootstrapSession();
 
     const renegotiateId = setInterval(() => {
       if (!initiator) return;
@@ -205,6 +243,7 @@ export default function App() {
     }, 5000);
 
     return () => {
+      disposed = true;
       clearInterval(pollId);
       clearInterval(renegotiateId);
       if (p2pRef.current) {
