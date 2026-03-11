@@ -751,13 +751,13 @@ body {
     left: 50%;
     transform: translateX(-50%);
     width: min(100%, 520px);
-    bottom: 0;
+    bottom: var(--kb-inset);
     z-index: 50;
     box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.35);
   }
 
   .keyboard-open .chat-window {
-    padding-bottom: calc(var(--kb-inset) + env(safe-area-inset-bottom));
+    padding-bottom: 0;
   }
 }
 
