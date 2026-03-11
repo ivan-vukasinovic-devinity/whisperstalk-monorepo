@@ -30,6 +30,7 @@ export default function App() {
   const [presenceByUserId, setPresenceByUserId] = useState({});
   const [feedback, setFeedback] = useState("");
   const [isMobileView, setIsMobileView] = useState(() => window.innerWidth <= 1080);
+  const connectionStateRef = useRef("disconnected");
   const p2pRef = useRef(null);
   const [inviteToken, setInviteToken] = useState(() => localStorage.getItem(INVITE_TOKEN_STORAGE_KEY) || "");
 
@@ -154,6 +155,8 @@ export default function App() {
 
   useEffect(() => {
     if (!identity || !activeContact) return;
+    setConnectionState("connecting");
+    connectionStateRef.current = "connecting";
 
     if (p2pRef.current) {
       p2pRef.current.destroy();
@@ -170,7 +173,10 @@ export default function App() {
       onDataMessage: (text) => {
         addMessage({ id: crypto.randomUUID(), text, me: false, createdAt: new Date().toISOString() });
       },
-      onStateChange: setConnectionState
+      onStateChange: (nextState) => {
+        connectionStateRef.current = nextState;
+        setConnectionState(nextState);
+      }
     });
     p2pRef.current = session;
 
@@ -189,15 +195,24 @@ export default function App() {
       }
     }, 1200);
 
+    const renegotiateId = setInterval(() => {
+      if (!initiator) return;
+      if (!activePeerOnline) return;
+      if (connectionStateRef.current === "connected") return;
+      session.startOffer({ iceRestart: true }).catch(() => {});
+    }, 5000);
+
     return () => {
       clearInterval(pollId);
+      clearInterval(renegotiateId);
       if (p2pRef.current) {
         p2pRef.current.destroy();
         p2pRef.current = null;
       }
       setConnectionState("disconnected");
+      connectionStateRef.current = "disconnected";
     };
-  }, [identity, activeContact, addMessage]);
+  }, [identity, activeContact, addMessage, activePeerOnline]);
 
   useEffect(() => {
     if (!activeContact || connectionState !== "connected" || !p2pRef.current) return;

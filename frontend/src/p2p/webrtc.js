@@ -1,4 +1,4 @@
-const ICE_SERVERS = [{ urls: "stun:stun.l.google.com:19302" }];
+const ICE_SERVERS = [];
 
 export function createP2PSession({
   localUserId,
@@ -10,6 +10,7 @@ export function createP2PSession({
 }) {
   const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
   let dataChannel = null;
+  const pendingRemoteCandidates = [];
 
   function setState(state) {
     if (onStateChange) onStateChange(state);
@@ -29,6 +30,14 @@ export function createP2PSession({
     });
   };
 
+  async function flushPendingCandidates() {
+    if (!pc.remoteDescription) return;
+    while (pendingRemoteCandidates.length > 0) {
+      const candidate = pendingRemoteCandidates.shift();
+      await pc.addIceCandidate(candidate);
+    }
+  }
+
   function wireDataChannel(channel) {
     dataChannel = channel;
     dataChannel.onopen = () => setState("connected");
@@ -46,9 +55,10 @@ export function createP2PSession({
     };
   }
 
-  async function startOffer() {
+  async function startOffer({ iceRestart = false } = {}) {
     if (!initiator) return;
-    const offer = await pc.createOffer();
+    if (pc.signalingState !== "stable") return;
+    const offer = await pc.createOffer({ iceRestart });
     await pc.setLocalDescription(offer);
     await sendSignal({
       sender_id: localUserId,
@@ -60,7 +70,15 @@ export function createP2PSession({
 
   async function handleSignal(signal) {
     if (signal.message_type === "offer") {
+      if (pc.signalingState !== "stable") {
+        try {
+          await pc.setLocalDescription({ type: "rollback" });
+        } catch (_) {
+          // Ignore rollback failures and continue with best effort handling.
+        }
+      }
       await pc.setRemoteDescription(new RTCSessionDescription(signal.payload));
+      await flushPendingCandidates();
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
       await sendSignal({
@@ -73,10 +91,16 @@ export function createP2PSession({
     }
     if (signal.message_type === "answer") {
       await pc.setRemoteDescription(new RTCSessionDescription(signal.payload));
+      await flushPendingCandidates();
       return;
     }
     if (signal.message_type === "candidate") {
-      await pc.addIceCandidate(new RTCIceCandidate(signal.payload));
+      const candidate = new RTCIceCandidate(signal.payload);
+      if (!pc.remoteDescription) {
+        pendingRemoteCandidates.push(candidate);
+        return;
+      }
+      await pc.addIceCandidate(candidate);
     }
   }
 
