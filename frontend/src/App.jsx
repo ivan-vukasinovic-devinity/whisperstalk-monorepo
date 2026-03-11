@@ -135,6 +135,10 @@ export default function App() {
 
   useEffect(() => {
     if (!identity) return;
+    refreshContactsAndPending(identity.id).catch(() => {
+      setFeedback("Session is stale. Please log in again.");
+      setIdentity(null);
+    });
     const id = setInterval(() => refreshContactsAndPending(identity.id).catch(() => {}), 5000);
     return () => clearInterval(id);
   }, [identity]);

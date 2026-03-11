@@ -1,4 +1,28 @@
-const ICE_SERVERS = [];
+function buildIceServers() {
+  // Default public STUN + free OpenRelay TURN for quick testing.
+  // For production, replace via VITE_STUN_URL / VITE_TURN_* env vars.
+  const stunUrl = import.meta.env.VITE_STUN_URL || "stun:stun.l.google.com:19302";
+  const turnUrls =
+    import.meta.env.VITE_TURN_URL ||
+    "turn:openrelay.metered.ca:80?transport=udp,turn:openrelay.metered.ca:80?transport=tcp";
+  const turnUsername = import.meta.env.VITE_TURN_USERNAME || "openrelayproject";
+  const turnCredential = import.meta.env.VITE_TURN_CREDENTIAL || "openrelayproject";
+
+  const servers = [{ urls: stunUrl }];
+  if (turnUrls && turnUsername && turnCredential) {
+    servers.push({
+      urls: turnUrls
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean),
+      username: turnUsername,
+      credential: turnCredential
+    });
+  }
+  return servers;
+}
+
+const ICE_SERVERS = buildIceServers();
 
 export function createP2PSession({
   localUserId,
