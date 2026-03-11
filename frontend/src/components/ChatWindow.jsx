@@ -3,6 +3,7 @@ import { useState } from "react";
 export function ChatWindow({
   contact,
   connectionState,
+  peerOnline = false,
   messages,
   onSend,
   showBack = false,
@@ -10,6 +11,10 @@ export function ChatWindow({
   feedback = ""
 }) {
   const [text, setText] = useState("");
+  const statusLabel =
+    connectionState === "connected" ? "connected" : peerOnline ? "online" : "offline";
+  const statusDotClass =
+    connectionState === "connected" ? "green" : peerOnline ? "yellow" : "red";
 
   if (!contact) {
     return (
@@ -32,8 +37,8 @@ export function ChatWindow({
         {feedback ? <p className="header-feedback">{feedback}</p> : null}
         <div className="chat-header-actions">
           <span className={`status-pill ${connectionState === "connected" ? "online" : ""}`}>
-            <span className={`dot ${connectionState === "connected" ? "green" : "red"}`} />
-            {connectionState === "connected" ? "connected" : "not connected"}
+            <span className={`dot ${statusDotClass}`} />
+            {statusLabel}
           </span>
           {showBack && onBack ? (
             <button className="btn small ghost back-btn" onClick={onBack}>

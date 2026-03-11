@@ -19,7 +19,7 @@ export function ContactList({ contacts, activeContactId, onSelect, presenceByUse
               />
             </span>
             <span className="contact-preview">
-              {presenceByUserId?.[contact.contact_user_id] ? "connected" : "not connected"}
+              {presenceByUserId?.[contact.contact_user_id] ? "online" : "offline"}
             </span>
           </button>
         ))

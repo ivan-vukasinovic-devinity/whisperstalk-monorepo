@@ -37,6 +37,7 @@ export default function App() {
     if (!identity || !activeContact) return null;
     return [identity.id, activeContact.contact_user_id].sort().join("_");
   }, [identity, activeContact]);
+  const activePeerOnline = activeContact ? !!presenceByUserId[activeContact.contact_user_id] : false;
 
   const { messages, addMessage, updateMessage } = useEphemeralMessages(conversationKey);
 
@@ -237,10 +238,14 @@ export default function App() {
           sentAt: new Date().toISOString()
         });
       } catch (_) {
-        setFeedback("Peer is offline. Message queued and will send on reconnect.");
+        setFeedback("Peer is not connected to chat yet. Message queued and will send on reconnect.");
       }
     } else {
-      setFeedback("Peer is offline. Message queued and will send on reconnect.");
+      setFeedback(
+        activePeerOnline
+          ? "Peer is online but not connected to this chat yet. Message queued."
+          : "Peer is offline. Message queued and will send on reconnect."
+      );
     }
   }
 
@@ -346,6 +351,7 @@ export default function App() {
             <ChatWindow
               contact={activeContact}
               connectionState={connectionState}
+              peerOnline={activePeerOnline}
               messages={messages}
               onSend={sendMessage}
               showBack={isMobileView && !!activeContact}
