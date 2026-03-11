@@ -17,7 +17,12 @@ export function useEphemeralMessages(conversationKey) {
       return;
     }
     const raw = localStorage.getItem(storageKey);
-    const parsed = raw ? JSON.parse(raw) : [];
+    let parsed = [];
+    try {
+      parsed = raw ? JSON.parse(raw) : [];
+    } catch (_) {
+      parsed = [];
+    }
     setMessages(prune(parsed));
   }, [conversationKey, storageKey]);
 

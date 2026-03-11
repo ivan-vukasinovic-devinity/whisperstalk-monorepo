@@ -77,6 +77,12 @@ export function ChatWindow({
           value={text}
           placeholder="type a message..."
           onChange={(event) => setText(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" && text.trim()) {
+              onSend(text.trim());
+              setText("");
+            }
+          }}
         />
         <button
           className="btn icon-btn"

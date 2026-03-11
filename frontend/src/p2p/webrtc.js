@@ -41,7 +41,12 @@ export function createP2PSession({
   }
 
   pc.onconnectionstatechange = () => {
-    setState(pc.connectionState);
+    // Only forward non-"connected" states here. "connected" is emitted exclusively
+    // from dataChannel.onopen so the App never sees the channel as ready before
+    // it can actually send data.
+    if (pc.connectionState !== "connected") {
+      setState(pc.connectionState);
+    }
   };
 
   pc.onicecandidate = async (event) => {
@@ -101,7 +106,7 @@ export function createP2PSession({
           // Ignore rollback failures and continue with best effort handling.
         }
       }
-      await pc.setRemoteDescription(new RTCSessionDescription(signal.payload));
+      await pc.setRemoteDescription(signal.payload);
       await flushPendingCandidates();
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
@@ -114,7 +119,7 @@ export function createP2PSession({
       return;
     }
     if (signal.message_type === "answer") {
-      await pc.setRemoteDescription(new RTCSessionDescription(signal.payload));
+      await pc.setRemoteDescription(signal.payload);
       await flushPendingCandidates();
       return;
     }
