@@ -14,6 +14,9 @@ DigitalOcean will:
 - Provision a managed PostgreSQL database
 - Inject `DATABASE_URL` into runtime env vars
 
+Important:
+- Keep `source_dir` as `backend` and `dockerfile_path` as `Dockerfile` in `.do/app.yaml` (no leading `/`), so App Platform detects the Docker component correctly.
+
 ## Option B: Configure in UI manually
 
 If you prefer no spec file:
@@ -21,6 +24,7 @@ If you prefer no spec file:
 - **Dockerfile path**: `backend/Dockerfile`
 - **HTTP port**: `8080`
 - **Plan**: `Basic XXS` (or higher)
+- If you choose a Python buildpack component instead of Docker, this repo also includes `backend/Procfile` and `backend/.python-version` for compatibility.
 
 Create a managed PostgreSQL database (PostgreSQL 16) and set these runtime env vars:
 - `APP_NAME=Whispers Backend`
@@ -38,4 +42,6 @@ After deployment succeeds:
 ## Important notes
 
 - Replace `CORS_ORIGINS` with your real frontend domain(s), comma-separated if multiple.
-- Current backend creates DB tables at startup (`Base.metadata.create_all(bind=engine)`), suitable for MVP. For production migrations, use Alembic later.
+- Backend now retries DB startup initialization briefly to avoid crash loops while managed DB is becoming ready.
+- `DATABASE_URL` values starting with `postgres://` or `postgresql://` are normalized automatically for SQLAlchemy.
+- Current backend creates DB tables at startup, suitable for MVP. For production migrations, use Alembic later.
