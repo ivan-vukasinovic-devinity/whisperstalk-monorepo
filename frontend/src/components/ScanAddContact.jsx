@@ -19,16 +19,24 @@ function extractToken(rawInput) {
   return input;
 }
 
-export function ScanAddContact({ userId, onSubmit, disabled, initialInviteValue = "" }) {
-  const [value, setValue] = useState("");
+function pickRearCamera(cameras) {
+  const rear = cameras.find(
+    (c) => /back|rear|environment/i.test(c.label)
+  );
+  return rear || cameras[cameras.length - 1];
+}
+
+export function ScanAddContact({ userId, onSubmitQr, onSubmitIdentifier, disabled, initialInviteValue = "" }) {
+  const [qrValue, setQrValue] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [scanning, setScanning] = useState(false);
   const [scanError, setScanError] = useState("");
   const scannerRef = useRef(null);
-  const token = useMemo(() => extractToken(value), [value]);
+  const token = useMemo(() => extractToken(qrValue), [qrValue]);
 
   useEffect(() => {
     if (initialInviteValue) {
-      setValue(initialInviteValue);
+      setQrValue(initialInviteValue);
     }
   }, [initialInviteValue]);
 
@@ -44,13 +52,14 @@ export function ScanAddContact({ userId, onSubmit, disabled, initialInviteValue 
           setScanError("No camera available for QR scanning.");
           return;
         }
+        const camera = pickRearCamera(cameras);
         const scanner = new Html5Qrcode("qr-reader");
         scannerRef.current = scanner;
         await scanner.start(
-          { deviceId: { exact: cameras[0].id } },
+          { deviceId: { exact: camera.id } },
           { fps: 8, qrbox: 220 },
           (decodedText) => {
-            setValue(decodedText);
+            setQrValue(decodedText);
             setScanning(false);
           },
           () => {}
@@ -76,37 +85,59 @@ export function ScanAddContact({ userId, onSubmit, disabled, initialInviteValue 
   }, [scanning]);
 
   return (
-    <section className="panel">
-      <h3>Add Contact</h3>
-      <p className="muted">Scan a contact QR code, then send request.</p>
-      <button
-        className="btn ghost"
-        disabled={disabled || scanning}
-        onClick={() => {
-          setScanError("");
-          setScanning(true);
-        }}
-      >
-        {scanning ? "Scanning..." : "Start QR Camera Scan"}
-      </button>
-      {scanning ? <div id="qr-reader" className="scanner" /> : null}
-      {scanError ? <p className="feedback">{scanError}</p> : null}
-      <input
-        className="text-input"
-        placeholder="Scanned QR payload or invite link"
-        value={value}
-        onChange={(event) => setValue(event.target.value)}
-      />
-      <button
-        className="btn"
-        disabled={disabled || !token || !userId}
-        onClick={() => {
-          onSubmit(token);
-          setValue("");
-        }}
-      >
-        Send Request
-      </button>
-    </section>
+    <>
+      <section className="panel add-contact-section">
+        <h3>Scan QR Code</h3>
+        <p className="muted">Scan a contact's QR code to send them a request.</p>
+        <button
+          className="btn ghost full-width-btn"
+          disabled={disabled || scanning}
+          onClick={() => {
+            setScanError("");
+            setScanning(true);
+          }}
+        >
+          {scanning ? "Scanning..." : "Open Camera"}
+        </button>
+        {scanning ? <div id="qr-reader" className="scanner" /> : null}
+        {scanError ? <p className="feedback-inline">{scanError}</p> : null}
+        {token ? (
+          <div className="qr-result">
+            <span className="mono">{token}</span>
+            <button
+              className="btn small"
+              disabled={disabled || !userId}
+              onClick={() => {
+                onSubmitQr(token);
+                setQrValue("");
+              }}
+            >
+              Send Request
+            </button>
+          </div>
+        ) : null}
+      </section>
+
+      <section className="panel add-contact-section">
+        <h3>Add by Username or ID</h3>
+        <p className="muted">Enter a username or user ID to send a contact request.</p>
+        <input
+          className="text-input"
+          placeholder="Username or User ID"
+          value={identifier}
+          onChange={(event) => setIdentifier(event.target.value)}
+        />
+        <button
+          className="btn full-width-btn"
+          disabled={disabled || !identifier.trim() || !userId}
+          onClick={() => {
+            onSubmitIdentifier(identifier.trim());
+            setIdentifier("");
+          }}
+        >
+          Send Request
+        </button>
+      </section>
+    </>
   );
 }

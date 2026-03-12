@@ -45,8 +45,20 @@ export const apiClient = {
   createContactRequest(payload) {
     return request("/contacts/requests", { method: "POST", body: JSON.stringify(payload) });
   },
+  createContactRequestByIdentifier(requesterId, identifier) {
+    return request("/contacts/requests/by-identifier", {
+      method: "POST",
+      body: JSON.stringify({ requester_id: requesterId, identifier })
+    });
+  },
   acceptContactRequest(requestId, userId) {
     return request(`/contacts/requests/${requestId}/accept`, {
+      method: "POST",
+      body: JSON.stringify({ user_id: userId })
+    });
+  },
+  rejectContactRequest(requestId, userId) {
+    return request(`/contacts/requests/${requestId}/reject`, {
       method: "POST",
       body: JSON.stringify({ user_id: userId })
     });

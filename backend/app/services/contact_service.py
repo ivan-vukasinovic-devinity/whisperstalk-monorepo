@@ -77,11 +77,80 @@ def list_contacts_for_user(db: Session, user_id: str) -> list[dict]:
     ]
 
 
-def list_pending_requests_for_user(db: Session, user_id: str) -> list[ContactRequest]:
+def reject_contact_request(db: Session, request_id: str, user_id: str) -> ContactRequest:
+    request = db.query(ContactRequest).filter(ContactRequest.id == request_id).first()
+    if not request:
+        raise AppError("Contact request not found", status_code=404, code="request_not_found")
+    if request.target_id != user_id:
+        raise AppError("Only request target can decline this request", status_code=403, code="request_forbidden")
+    if request.status != ContactRequestStatus.pending:
+        raise AppError("Contact request is not pending", status_code=409, code="request_not_pending")
+
+    request.status = ContactRequestStatus.rejected
+    request.responded_at = datetime.now(timezone.utc)
+    db.add(request)
+    db.commit()
+    db.refresh(request)
+    return request
+
+
+def create_contact_request_by_identifier(db: Session, requester_id: str, identifier: str) -> ContactRequest:
+    """Create a contact request using a username or user ID as the identifier."""
+    requester = get_user_or_404(db, requester_id)
+
+    target = db.query(User).filter(User.username == identifier.strip()).first()
+    if not target:
+        target = db.query(User).filter(User.id == identifier.strip()).first()
+    if not target:
+        raise AppError("User not found", status_code=404, code="user_not_found")
+
+    if requester.id == target.id:
+        raise AppError("You cannot add yourself", status_code=400, code="invalid_self_add")
+
+    existing_contact = (
+        db.query(Contact).filter(Contact.user_id == requester.id, Contact.contact_user_id == target.id).first()
+    )
+    if existing_contact:
+        raise AppError("Contact already exists", status_code=409, code="contact_exists")
+
+    request = ContactRequest(requester_id=requester.id, target_id=target.id, status=ContactRequestStatus.pending)
+    db.add(request)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        existing_request = (
+            db.query(ContactRequest)
+            .filter(ContactRequest.requester_id == requester.id, ContactRequest.target_id == target.id)
+            .first()
+        )
+        if existing_request and existing_request.status == ContactRequestStatus.pending:
+            raise AppError("Contact request already pending", status_code=409, code="request_pending")
+        raise
+
+    db.refresh(request)
+    return request
+
+
+def list_pending_requests_for_user(db: Session, user_id: str) -> list[dict]:
     get_user_or_404(db, user_id)
-    return (
-        db.query(ContactRequest)
+    rows = (
+        db.query(ContactRequest, User)
+        .join(User, User.id == ContactRequest.requester_id)
         .filter(ContactRequest.target_id == user_id, ContactRequest.status == ContactRequestStatus.pending)
         .order_by(ContactRequest.created_at.asc())
         .all()
     )
+    return [
+        {
+            "id": req.id,
+            "requester_id": req.requester_id,
+            "requester_username": user.username,
+            "requester_display_name": user.display_name,
+            "target_id": req.target_id,
+            "status": req.status,
+            "created_at": req.created_at,
+            "responded_at": req.responded_at,
+        }
+        for req, user in rows
+    ]

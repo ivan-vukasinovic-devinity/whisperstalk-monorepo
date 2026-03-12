@@ -116,12 +116,33 @@ export default function App() {
     }
   }
 
+  async function sendContactRequestByIdentifier(identifier) {
+    if (!identity) return;
+    try {
+      await apiClient.createContactRequestByIdentifier(identity.id, identifier);
+      setFeedback("Contact request sent.");
+    } catch (error) {
+      setFeedback(error.message);
+    }
+  }
+
   async function acceptRequest(requestId) {
     if (!identity) return;
     try {
       await apiClient.acceptContactRequest(requestId, identity.id);
       await refreshContactsAndPending(identity.id);
       setFeedback("Request accepted.");
+    } catch (error) {
+      setFeedback(error.message);
+    }
+  }
+
+  async function rejectRequest(requestId) {
+    if (!identity) return;
+    try {
+      await apiClient.rejectContactRequest(requestId, identity.id);
+      await refreshContactsAndPending(identity.id);
+      setFeedback("Request declined.");
     } catch (error) {
       setFeedback(error.message);
     }
@@ -352,8 +373,8 @@ export default function App() {
                   <h2>WhisperTalk</h2>
                 </div>
                 <div className="contacts-header-actions">
-                  <button className="icon-action" onClick={() => setActiveScreen("settings")} aria-label="Open settings">
-                    ⚙
+                  <button className="icon-action" onClick={() => setActiveScreen("add-contact")} aria-label="Add contact">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                   </button>
                 </div>
               </header>
@@ -369,21 +390,28 @@ export default function App() {
                 presenceByUserId={presenceByUserId}
               />
 
-              <section className="panel pending-panel">
-                <h3>Pending Requests</h3>
-                {pending.length === 0 ? (
-                  <p className="muted">No pending requests.</p>
-                ) : (
-                  pending.map((request) => (
-                    <div key={request.id} className="row">
-                      <span className="mono">{request.requester_id.slice(0, 8)}...</span>
-                      <button className="btn small" onClick={() => acceptRequest(request.id)}>
-                        Accept
-                      </button>
+              {pending.length > 0 ? (
+                <section className="panel pending-panel">
+                  <h3>Pending Requests ({pending.length})</h3>
+                  {pending.map((request) => (
+                    <div key={request.id} className="pending-request-card">
+                      <div className="pending-request-info">
+                        <span className="pending-username">{request.requester_username}</span>
+                        <span className="pending-id mono">{request.requester_id.slice(0, 12)}...</span>
+                        <span className="pending-time muted">
+                          {new Date(request.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                          {" "}
+                          {new Date(request.created_at).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
+                        </span>
+                      </div>
+                      <div className="pending-request-actions">
+                        <button className="btn small" onClick={() => acceptRequest(request.id)}>Accept</button>
+                        <button className="btn small ghost" onClick={() => rejectRequest(request.id)}>Decline</button>
+                      </div>
                     </div>
-                  ))
-                )}
-              </section>
+                  ))}
+                </section>
+              ) : null}
 
               <footer className="screen-footer">
                 <span className="sidebar-footnote">E2E ENCRYPTED • P2P</span>
@@ -409,6 +437,25 @@ export default function App() {
             </section>
           ) : null}
 
+          {activeScreen === "add-contact" ? (
+            <section className="settings-screen">
+              <header className="settings-header">
+                <button className="icon-action back-arrow" onClick={() => setActiveScreen("contacts")} aria-label="Back to contacts">
+                  ←
+                </button>
+                <h2>Add Contact</h2>
+              </header>
+
+              <ScanAddContact
+                userId={identity.id}
+                onSubmitQr={sendContactRequest}
+                onSubmitIdentifier={sendContactRequestByIdentifier}
+                initialInviteValue={inviteToken}
+              />
+              <QRCodeCard user={identity} />
+            </section>
+          ) : null}
+
           {activeScreen === "settings" ? (
             <section className="settings-screen">
               <header className="settings-header">
@@ -424,9 +471,6 @@ export default function App() {
                   <strong>{identity.username}</strong>
                 </div>
               </section>
-
-              <QRCodeCard user={identity} />
-              <ScanAddContact userId={identity.id} onSubmit={sendContactRequest} initialInviteValue={inviteToken} />
 
               <section className="panel settings-actions-card">
                 <button className="btn ghost full-width-btn" onClick={logout}>

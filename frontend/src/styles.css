@@ -863,3 +863,91 @@ body {
   background: #131937;
   color: #dfe6ff;
 }
+
+.pending-request-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid #232845;
+}
+
+.pending-request-card:last-child {
+  border-bottom: 0;
+}
+
+.pending-request-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.pending-username {
+  font-size: 15px;
+  font-weight: 700;
+  color: #eef1ff;
+}
+
+.pending-id {
+  font-size: 11px;
+  color: #8a93b6;
+}
+
+.pending-time {
+  font-size: 11px;
+}
+
+.pending-request-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.add-contact-section {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  border-bottom: 1px solid #232845;
+  background: #0f1223;
+  padding: 14px;
+}
+
+.add-contact-section h3 {
+  margin-bottom: 6px;
+}
+
+.add-contact-section .muted {
+  margin: 0 0 10px;
+  font-size: 13px;
+}
+
+.qr-result {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 10px;
+  background: #151a33;
+  border: 1px solid #303960;
+  border-radius: 10px;
+}
+
+.qr-result .mono {
+  font-size: 12px;
+  word-break: break-all;
+  flex: 1;
+  min-width: 0;
+}
+
+.feedback-inline {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: #ff7b7b;
+}
+
+.contacts-header-actions .icon-action svg {
+  display: block;
+}
