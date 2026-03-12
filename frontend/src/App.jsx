@@ -26,7 +26,7 @@ export default function App() {
   const [contacts, setContacts] = useState([]);
   const [pending, setPending] = useState([]);
   const [activeContact, setActiveContact] = useState(null);
-  const [nudgeFromSet, setNudgeFromSet] = useState(new Set());
+  const [unreadMap, setUnreadMap] = useState(new Map());
   const [feedback, setFeedback] = useState("");
   const [activeScreen, setActiveScreen] = useState("contacts");
   const activeContactRef = useRef(null);
@@ -83,9 +83,9 @@ export default function App() {
           existing.push(msg);
           localStorage.setItem(storeKey, JSON.stringify(existing));
         } catch (_) { /* storage full or corrupt — non-fatal */ }
-        setNudgeFromSet((prev) => {
-          const next = new Set(prev);
-          next.add(sender_id);
+        setUnreadMap((prev) => {
+          const next = new Map(prev);
+          next.set(sender_id, (prev.get(sender_id) || 0) + 1);
           return next;
         });
       }
@@ -93,9 +93,10 @@ export default function App() {
     }
 
     if (type === "nudge") {
-      setNudgeFromSet((prev) => {
-        const next = new Set(prev);
-        next.add(sender_id);
+      setUnreadMap((prev) => {
+        if (prev.has(sender_id)) return prev;
+        const next = new Map(prev);
+        next.set(sender_id, 0);
         return next;
       });
       return;
@@ -217,9 +218,9 @@ export default function App() {
     if (!identity || !activeContact) return;
     const remoteUserId = activeContact.contact_user_id;
     wsSend({ type: "nudge", recipient_id: remoteUserId });
-    setNudgeFromSet((prev) => {
+    setUnreadMap((prev) => {
       if (!prev.has(remoteUserId)) return prev;
-      const next = new Set(prev);
+      const next = new Map(prev);
       next.delete(remoteUserId);
       return next;
     });
@@ -328,7 +329,7 @@ export default function App() {
                   setActiveContact(contact);
                   setActiveScreen("chat");
                 }}
-                nudgeFromSet={nudgeFromSet}
+                unreadMap={unreadMap}
               />
 
               {pending.length > 0 ? (
@@ -371,7 +372,7 @@ export default function App() {
                 messages={messages}
                 onSend={sendMessage}
                 showBack={true}
-                onBack={() => setActiveScreen("contacts")}
+                onBack={() => { setActiveContact(null); setActiveScreen("contacts"); }}
                 feedback={feedback}
               />
             </section>
