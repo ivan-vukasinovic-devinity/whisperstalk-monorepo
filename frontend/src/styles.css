@@ -521,6 +521,8 @@ body {
   display: flex;
   flex-direction: column;
   position: relative;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .chat-screen {
