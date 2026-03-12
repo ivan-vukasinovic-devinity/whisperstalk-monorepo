@@ -10,6 +10,7 @@ from app.config import get_settings
 from app.db import Base, engine
 from app.routes.auth import router as auth_router
 from app.routes.contacts import router as contacts_router
+from app.routes.nudge import router as nudge_router
 from app.routes.presence import router as presence_router
 from app.routes.signaling import router as signaling_router
 from app.routes.users import router as users_router
@@ -55,6 +56,7 @@ app.include_router(users_router, prefix=settings.api_v1_prefix)
 app.include_router(contacts_router, prefix=settings.api_v1_prefix)
 app.include_router(presence_router, prefix=settings.api_v1_prefix)
 app.include_router(signaling_router, prefix=settings.api_v1_prefix)
+app.include_router(nudge_router, prefix=settings.api_v1_prefix)
 
 
 @app.on_event("startup")

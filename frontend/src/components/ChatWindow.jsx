@@ -3,7 +3,6 @@ import { useEffect, useRef, useState } from "react";
 export function ChatWindow({
   contact,
   connectionState,
-  peerOnline = false,
   messages,
   onSend,
   showBack = false,
@@ -16,10 +15,8 @@ export function ChatWindow({
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
-  const statusLabel =
-    connectionState === "connected" ? "connected" : peerOnline ? "online" : "offline";
-  const statusDotClass =
-    connectionState === "connected" ? "green" : peerOnline ? "yellow" : "red";
+  const statusLabel = connectionState === "connected" ? "connected" : "connecting";
+  const statusDotClass = connectionState === "connected" ? "green" : "yellow";
 
   if (!contact) {
     return (

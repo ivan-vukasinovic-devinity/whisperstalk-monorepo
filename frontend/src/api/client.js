@@ -31,16 +31,14 @@ export const apiClient = {
   getPendingRequests(userId) {
     return request(`/contacts/requests/pending/${userId}`);
   },
-  heartbeat(userId, activeChatWith = null) {
-    return request("/presence/heartbeat", {
+  sendNudge(senderId, recipientId) {
+    return request("/nudge", {
       method: "POST",
-      body: JSON.stringify({ user_id: userId, active_chat_with: activeChatWith })
+      body: JSON.stringify({ sender_id: senderId, recipient_id: recipientId })
     });
   },
-  getPresenceStatuses(userIds) {
-    if (!userIds?.length) return Promise.resolve([]);
-    const query = encodeURIComponent(userIds.join(","));
-    return request(`/presence/statuses?user_ids=${query}`);
+  consumeNudges(recipientId) {
+    return request(`/nudge/${recipientId}`);
   },
   createContactRequest(payload) {
     return request("/contacts/requests", { method: "POST", body: JSON.stringify(payload) });

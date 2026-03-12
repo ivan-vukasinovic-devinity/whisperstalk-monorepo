@@ -27,13 +27,10 @@ export default function App() {
   const [pending, setPending] = useState([]);
   const [activeContact, setActiveContact] = useState(null);
   const [connectionState, setConnectionState] = useState("disconnected");
-  const [presenceByUserId, setPresenceByUserId] = useState({});
-  const [wantsToChatSet, setWantsToChatSet] = useState(new Set());
+  const [nudgeFromSet, setNudgeFromSet] = useState(new Set());
   const [feedback, setFeedback] = useState("");
   const [activeScreen, setActiveScreen] = useState("contacts");
   const connectionStateRef = useRef("disconnected");
-  const activePeerOnlineRef = useRef(false);
-  const activeContactRef = useRef(null);
   const p2pRef = useRef(null);
   const [inviteToken, setInviteToken] = useState(() => localStorage.getItem(INVITE_TOKEN_STORAGE_KEY) || "");
 
@@ -41,7 +38,6 @@ export default function App() {
     if (!identity || !activeContact) return null;
     return [identity.id, activeContact.contact_user_id].sort().join("_");
   }, [identity, activeContact]);
-  const activePeerOnline = activeContact ? !!presenceByUserId[activeContact.contact_user_id] : false;
 
   const { messages, addMessage, updateMessage } = useEphemeralMessages(conversationKey);
 
@@ -68,30 +64,19 @@ export default function App() {
   }, [identity]);
 
   async function refreshContactsAndPending(userId) {
-    const [contactsData, pendingData] = await Promise.all([
+    const [contactsData, pendingData, nudgeSenders] = await Promise.all([
       apiClient.getContacts(userId),
-      apiClient.getPendingRequests(userId)
+      apiClient.getPendingRequests(userId),
+      apiClient.consumeNudges(userId).catch(() => []),
     ]);
     setContacts(contactsData);
     setPending(pendingData);
-    if (contactsData.length === 0) {
-      setPresenceByUserId({});
-      return;
-    }
-    try {
-      const statuses = await apiClient.getPresenceStatuses(contactsData.map((item) => item.contact_user_id));
-      const presenceMap = {};
-      const chatting = new Set();
-      for (const item of statuses) {
-        presenceMap[item.user_id] = item.is_online;
-        if (item.is_online && item.active_chat_with === userId) {
-          chatting.add(item.user_id);
-        }
-      }
-      setPresenceByUserId(presenceMap);
-      setWantsToChatSet(chatting);
-    } catch (_) {
-      // Presence indicators are best effort and should not block primary data loading.
+    if (nudgeSenders.length > 0) {
+      setNudgeFromSet((prev) => {
+        const next = new Set(prev);
+        for (const id of nudgeSenders) next.add(id);
+        return next;
+      });
     }
   }
 
@@ -160,20 +145,12 @@ export default function App() {
       setFeedback("Session is stale. Please log in again.");
       setIdentity(null);
     });
-    const id = setInterval(() => refreshContactsAndPending(identity.id).catch(() => {}), 5000);
-    return () => clearInterval(id);
   }, [identity]);
 
   useEffect(() => {
-    if (!identity) return undefined;
-    const run = () => {
-      const chatWith = activeContactRef.current?.contact_user_id || null;
-      apiClient.heartbeat(identity.id, chatWith).catch(() => {});
-    };
-    run();
-    const id = setInterval(run, 4000);
-    return () => clearInterval(id);
-  }, [identity]);
+    if (!identity || activeScreen !== "contacts") return;
+    refreshContactsAndPending(identity.id).catch(() => {});
+  }, [activeScreen]);
 
   useEffect(() => {
     if (identity && inviteToken) {
@@ -196,13 +173,6 @@ export default function App() {
     return () => document.removeEventListener("focusin", scrollComposerIntoView);
   }, []);
 
-  useEffect(() => {
-    activePeerOnlineRef.current = activePeerOnline;
-  }, [activePeerOnline]);
-
-  useEffect(() => {
-    activeContactRef.current = activeContact;
-  }, [activeContact]);
 
   useEffect(() => {
     if (!identity || !activeContact) return;
@@ -218,6 +188,15 @@ export default function App() {
 
     const remoteUserId = activeContact.contact_user_id;
     const initiator = identity.id < remoteUserId;
+
+    apiClient.sendNudge(identity.id, remoteUserId).catch(() => {});
+    setNudgeFromSet((prev) => {
+      if (!prev.has(remoteUserId)) return prev;
+      const next = new Set(prev);
+      next.delete(remoteUserId);
+      return next;
+    });
+
     const session = createP2PSession({
       localUserId: identity.id,
       remoteUserId,
@@ -243,7 +222,7 @@ export default function App() {
         } catch (_) {
           // Silent polling retries keep reconnection simple for MVP.
         }
-      }, 1200);
+      }, 2000);
 
       if (initiator) {
         session.startOffer().catch((error) => setFeedback(error.message));
@@ -253,10 +232,9 @@ export default function App() {
 
     const renegotiateId = setInterval(() => {
       if (!initiator) return;
-      if (!activePeerOnlineRef.current) return;
       if (connectionStateRef.current === "connected") return;
       session.startOffer({ iceRestart: true }).catch(() => {});
-    }, 5000);
+    }, 6000);
 
     return () => {
       disposed = true;
@@ -314,11 +292,7 @@ export default function App() {
         setFeedback("Peer is not connected to chat yet. Message queued and will send on reconnect.");
       }
     } else {
-      setFeedback(
-        activePeerOnline
-          ? "Peer is online but not connected to this chat yet. Message queued."
-          : "Peer is offline. Message queued and will send on reconnect."
-      );
+      setFeedback("Peer is not connected yet. Message queued and will send on reconnect.");
     }
   }
 
@@ -400,8 +374,7 @@ export default function App() {
                   setActiveContact(contact);
                   setActiveScreen("chat");
                 }}
-                presenceByUserId={presenceByUserId}
-                wantsToChatSet={wantsToChatSet}
+                nudgeFromSet={nudgeFromSet}
               />
 
               {pending.length > 0 ? (
@@ -441,7 +414,6 @@ export default function App() {
               <ChatWindow
                 contact={activeContact}
                 connectionState={connectionState}
-                peerOnline={activePeerOnline}
                 messages={messages}
                 onSend={sendMessage}
                 showBack={true}
