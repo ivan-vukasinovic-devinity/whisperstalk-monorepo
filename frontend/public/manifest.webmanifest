@@ -1,0 +1,19 @@
+{
+  "name": "WhisperTalk",
+  "short_name": "Whispers",
+  "description": "Private P2P messaging.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#060811",
+  "theme_color": "#060811",
+  "icons": [
+    {
+      "src": "/icons/app-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

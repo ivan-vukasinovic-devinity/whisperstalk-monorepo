@@ -154,12 +154,7 @@ export default function App() {
   useEffect(() => {
     function setViewportHeight() {
       const viewportHeight = window.visualViewport?.height || window.innerHeight;
-      const keyboardInset = window.visualViewport
-        ? Math.max(0, window.innerHeight - window.visualViewport.height - window.visualViewport.offsetTop)
-        : 0;
       document.documentElement.style.setProperty("--app-vh", `${viewportHeight}px`);
-      document.documentElement.style.setProperty("--kb-inset", `${keyboardInset}px`);
-      document.documentElement.classList.toggle("keyboard-open", keyboardInset > 120);
     }
 
     setViewportHeight();
@@ -171,77 +166,8 @@ export default function App() {
       window.removeEventListener("resize", setViewportHeight);
       window.visualViewport?.removeEventListener("resize", setViewportHeight);
       window.visualViewport?.removeEventListener("scroll", setViewportHeight);
-      document.documentElement.classList.remove("keyboard-open");
     };
   }, []);
-
-  useEffect(() => {
-    const ua = navigator.userAgent || "";
-    const platform = navigator.platform || "";
-    const isIOS =
-      /iPhone|iPad|iPod/i.test(ua) || (platform === "MacIntel" && navigator.maxTouchPoints > 1);
-    if (!isIOS) return;
-
-    let lockedScrollY = 0;
-    const root = document.documentElement;
-
-    function isComposerField(element) {
-      return (
-        element instanceof HTMLElement &&
-        (element.matches(".composer-input") ||
-          element.matches(".composer input") ||
-          element.matches(".composer textarea"))
-      );
-    }
-
-    function lockViewportScroll() {
-      if (root.classList.contains("ios-scroll-lock")) return;
-      lockedScrollY = window.scrollY || window.pageYOffset || 0;
-      root.classList.add("ios-scroll-lock", "composer-focused");
-      document.body.style.position = "fixed";
-      document.body.style.top = `-${lockedScrollY}px`;
-      document.body.style.left = "0";
-      document.body.style.right = "0";
-      document.body.style.width = "100%";
-      document.body.style.overflow = "hidden";
-    }
-
-    function unlockViewportScroll() {
-      root.classList.remove("ios-scroll-lock", "composer-focused");
-      const top = document.body.style.top;
-      document.body.style.position = "";
-      document.body.style.top = "";
-      document.body.style.left = "";
-      document.body.style.right = "";
-      document.body.style.width = "";
-      document.body.style.overflow = "";
-      const restoreY = top ? Math.abs(Number.parseInt(top, 10) || 0) : lockedScrollY;
-      window.scrollTo(0, restoreY);
-    }
-
-    function onFocusIn(event) {
-      if (activeScreen !== "chat") return;
-      if (!isComposerField(event.target)) return;
-      lockViewportScroll();
-    }
-
-    function onFocusOut(event) {
-      if (!isComposerField(event.target)) return;
-      setTimeout(() => {
-        if (isComposerField(document.activeElement)) return;
-        unlockViewportScroll();
-      }, 0);
-    }
-
-    document.addEventListener("focusin", onFocusIn);
-    document.addEventListener("focusout", onFocusOut);
-
-    return () => {
-      document.removeEventListener("focusin", onFocusIn);
-      document.removeEventListener("focusout", onFocusOut);
-      unlockViewportScroll();
-    };
-  }, [activeScreen]);
 
   useEffect(() => {
     activePeerOnlineRef.current = activePeerOnline;

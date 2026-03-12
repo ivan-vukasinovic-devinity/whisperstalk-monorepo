@@ -483,7 +483,6 @@ body {
 :root {
   color: #f5f7ff;
   background: #060811;
-  --kb-inset: 0px;
 }
 
 body {
@@ -491,14 +490,10 @@ body {
   color: #f5f7ff;
 }
 
-html.ios-scroll-lock,
-html.ios-scroll-lock body {
-  height: var(--app-vh, 100dvh);
-  overflow: hidden;
-  overscroll-behavior: none;
-}
-
 .app-shell {
+  height: var(--app-vh, 100dvh);
+  min-height: var(--app-vh, 100dvh);
+  overflow: hidden;
   padding: 0;
   background: transparent;
 }
@@ -755,22 +750,11 @@ html.ios-scroll-lock body {
 }
 
 @media (max-width: 1080px) {
-  .keyboard-open .composer {
-    position: fixed;
-    left: 50%;
-    transform: translateX(-50%);
-    width: min(100%, 520px);
-    bottom: var(--kb-inset);
-    z-index: 50;
-    box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.35);
-  }
-
-  .keyboard-open.composer-focused .composer {
-    transition: none;
-  }
-
-  .keyboard-open .chat-window {
-    padding-bottom: 0;
+  .composer {
+    position: sticky;
+    left: 0;
+    right: 0;
+    bottom: 0;
   }
 }
 
