@@ -170,6 +170,51 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    const ua = navigator.userAgent || "";
+    const platform = navigator.platform || "";
+    const isIOS =
+      /iPhone|iPad|iPod/i.test(ua) || (platform === "MacIntel" && navigator.maxTouchPoints > 1);
+    if (!isIOS) return;
+
+    function isComposerField(element) {
+      return (
+        element instanceof HTMLElement &&
+        (element.matches(".composer-input") ||
+          element.matches(".composer input") ||
+          element.matches(".composer textarea"))
+      );
+    }
+
+    function onFocusIn(event) {
+      if (!isComposerField(event.target)) return;
+      document.documentElement.classList.add("composer-focused");
+      requestAnimationFrame(() => {
+        const scroller = document.querySelector(".messages");
+        if (scroller instanceof HTMLElement) {
+          scroller.scrollTop = scroller.scrollHeight;
+        }
+      });
+    }
+
+    function onFocusOut(event) {
+      if (!isComposerField(event.target)) return;
+      setTimeout(() => {
+        if (isComposerField(document.activeElement)) return;
+        document.documentElement.classList.remove("composer-focused");
+      }, 0);
+    }
+
+    document.addEventListener("focusin", onFocusIn);
+    document.addEventListener("focusout", onFocusOut);
+
+    return () => {
+      document.removeEventListener("focusin", onFocusIn);
+      document.removeEventListener("focusout", onFocusOut);
+      document.documentElement.classList.remove("composer-focused");
+    };
+  }, []);
+
+  useEffect(() => {
     activePeerOnlineRef.current = activePeerOnline;
   }, [activePeerOnline]);
 
