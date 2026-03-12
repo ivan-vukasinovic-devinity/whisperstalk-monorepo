@@ -27,10 +27,10 @@ export function ScanAddContact({ userId, onSubmit, disabled, initialInviteValue 
   const token = useMemo(() => extractToken(value), [value]);
 
   useEffect(() => {
-    if (initialInviteValue && initialInviteValue !== value) {
+    if (initialInviteValue) {
       setValue(initialInviteValue);
     }
-  }, [initialInviteValue, value]);
+  }, [initialInviteValue]);
 
   useEffect(() => {
     if (!scanning) return undefined;
@@ -67,12 +67,10 @@ export function ScanAddContact({ userId, onSubmit, disabled, initialInviteValue 
 
     return () => {
       mounted = false;
-      if (scannerRef.current) {
-        scannerRef.current
-          .stop()
-          .then(() => scannerRef.current?.clear())
-          .catch(() => {});
+      const scanner = scannerRef.current;
+      if (scanner) {
         scannerRef.current = null;
+        scanner.stop().then(() => scanner.clear()).catch(() => {});
       }
     };
   }, [scanning]);
