@@ -69,9 +69,25 @@ export default function App() {
     const { type, sender_id } = data;
 
     if (type === "chat") {
+      if (!identity) return;
+      const msg = { id: data.id || crypto.randomUUID(), text: data.text, me: false, createdAt: new Date().toISOString() };
       const current = activeContactRef.current;
+
       if (current && sender_id === current.contact_user_id) {
-        addMessage({ id: data.id || crypto.randomUUID(), text: data.text, me: false, createdAt: new Date().toISOString() });
+        addMessage(msg);
+      } else {
+        const convKey = [identity.id, sender_id].sort().join("_");
+        const storeKey = `whispers_msgs_${convKey}`;
+        try {
+          const existing = JSON.parse(localStorage.getItem(storeKey) || "[]");
+          existing.push(msg);
+          localStorage.setItem(storeKey, JSON.stringify(existing));
+        } catch (_) { /* storage full or corrupt — non-fatal */ }
+        setNudgeFromSet((prev) => {
+          const next = new Set(prev);
+          next.add(sender_id);
+          return next;
+        });
       }
       return;
     }
