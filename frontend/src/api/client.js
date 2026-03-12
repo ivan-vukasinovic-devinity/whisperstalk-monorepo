@@ -31,10 +31,10 @@ export const apiClient = {
   getPendingRequests(userId) {
     return request(`/contacts/requests/pending/${userId}`);
   },
-  heartbeat(userId) {
+  heartbeat(userId, activeChatWith = null) {
     return request("/presence/heartbeat", {
       method: "POST",
-      body: JSON.stringify({ user_id: userId })
+      body: JSON.stringify({ user_id: userId, active_chat_with: activeChatWith })
     });
   },
   getPresenceStatuses(userIds) {

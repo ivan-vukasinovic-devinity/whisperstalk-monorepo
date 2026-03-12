@@ -17,6 +17,28 @@ from app.utils.error_handlers import register_exception_handlers
 
 settings = get_settings()
 app = FastAPI(title=settings.app_name)
+
+
+def _run_migrations(connection) -> None:
+    """Add columns that create_all won't add to existing tables."""
+    migrations = [
+        (
+            "presence",
+            "active_chat_with",
+            "ALTER TABLE presence ADD COLUMN active_chat_with VARCHAR(36)",
+        ),
+    ]
+    for table, column, ddl in migrations:
+        result = connection.execute(
+            text(
+                "SELECT 1 FROM information_schema.columns "
+                "WHERE table_name = :table AND column_name = :column"
+            ),
+            {"table": table, "column": column},
+        )
+        if result.fetchone() is None:
+            connection.execute(text(ddl))
+            logging.getLogger(__name__).info("Migration: added %s.%s", table, column)
 logger = logging.getLogger(__name__)
 
 app.add_middleware(
@@ -43,6 +65,8 @@ async def initialize_database() -> None:
             with engine.begin() as connection:
                 connection.execute(text("SELECT 1"))
             Base.metadata.create_all(bind=engine)
+            with engine.begin() as connection:
+                _run_migrations(connection)
             logger.info("Database is ready and schema initialized.")
             return
         except SQLAlchemyError as exc:

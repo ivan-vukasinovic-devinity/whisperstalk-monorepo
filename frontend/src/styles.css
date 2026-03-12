@@ -951,3 +951,30 @@ body {
 .contacts-header-actions .icon-action svg {
   display: block;
 }
+
+.contact-btn.wants-chat {
+  background: #131836;
+  border-color: #6c5cff;
+  animation: nudge-pulse 2s ease-in-out infinite;
+}
+
+@keyframes nudge-pulse {
+  0%, 100% { box-shadow: inset 0 0 0 0 rgba(108, 92, 255, 0); }
+  50% { box-shadow: inset 0 0 0 2px rgba(108, 92, 255, 0.35); }
+}
+
+.chat-nudge-badge {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #6c5cff;
+  margin-left: 6px;
+  vertical-align: middle;
+  box-shadow: 0 0 0 3px rgba(108, 92, 255, 0.25);
+}
+
+.contact-btn.wants-chat .contact-preview {
+  color: #b0a8ff;
+  font-weight: 600;
+}

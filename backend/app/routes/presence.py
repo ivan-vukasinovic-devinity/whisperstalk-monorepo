@@ -11,7 +11,7 @@ router = APIRouter(prefix="/presence", tags=["presence"])
 
 @router.post("/heartbeat", response_model=ApiMessage)
 def post_heartbeat(payload: PresenceHeartbeatRequest, db: Session = Depends(get_db)) -> ApiMessage:
-    heartbeat(db, payload.user_id)
+    heartbeat(db, payload.user_id, active_chat_with=payload.active_chat_with)
     return ApiMessage(message="ok")
 
 

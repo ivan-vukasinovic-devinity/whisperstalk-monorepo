@@ -28,10 +28,12 @@ export default function App() {
   const [activeContact, setActiveContact] = useState(null);
   const [connectionState, setConnectionState] = useState("disconnected");
   const [presenceByUserId, setPresenceByUserId] = useState({});
+  const [wantsToChatSet, setWantsToChatSet] = useState(new Set());
   const [feedback, setFeedback] = useState("");
   const [activeScreen, setActiveScreen] = useState("contacts");
   const connectionStateRef = useRef("disconnected");
   const activePeerOnlineRef = useRef(false);
+  const activeContactRef = useRef(null);
   const p2pRef = useRef(null);
   const [inviteToken, setInviteToken] = useState(() => localStorage.getItem(INVITE_TOKEN_STORAGE_KEY) || "");
 
@@ -78,12 +80,16 @@ export default function App() {
     }
     try {
       const statuses = await apiClient.getPresenceStatuses(contactsData.map((item) => item.contact_user_id));
-      setPresenceByUserId(
-        statuses.reduce((acc, item) => {
-          acc[item.user_id] = item.is_online;
-          return acc;
-        }, {})
-      );
+      const presenceMap = {};
+      const chatting = new Set();
+      for (const item of statuses) {
+        presenceMap[item.user_id] = item.is_online;
+        if (item.is_online && item.active_chat_with === userId) {
+          chatting.add(item.user_id);
+        }
+      }
+      setPresenceByUserId(presenceMap);
+      setWantsToChatSet(chatting);
     } catch (_) {
       // Presence indicators are best effort and should not block primary data loading.
     }
@@ -160,7 +166,10 @@ export default function App() {
 
   useEffect(() => {
     if (!identity) return undefined;
-    const run = () => apiClient.heartbeat(identity.id).catch(() => {});
+    const run = () => {
+      const chatWith = activeContactRef.current?.contact_user_id || null;
+      apiClient.heartbeat(identity.id, chatWith).catch(() => {});
+    };
     run();
     const id = setInterval(run, 4000);
     return () => clearInterval(id);
@@ -190,6 +199,10 @@ export default function App() {
   useEffect(() => {
     activePeerOnlineRef.current = activePeerOnline;
   }, [activePeerOnline]);
+
+  useEffect(() => {
+    activeContactRef.current = activeContact;
+  }, [activeContact]);
 
   useEffect(() => {
     if (!identity || !activeContact) return;
@@ -388,6 +401,7 @@ export default function App() {
                   setActiveScreen("chat");
                 }}
                 presenceByUserId={presenceByUserId}
+                wantsToChatSet={wantsToChatSet}
               />
 
               {pending.length > 0 ? (
