@@ -200,19 +200,6 @@ export default function App() {
     p2pRef.current = session;
 
     async function bootstrapSession() {
-      // Old queued offers/candidates can poison renegotiation for long-lived user pairs.
-      // Drain stale pair-specific signaling once before starting a fresh session.
-      try {
-        await apiClient.consumeSignals(identity.id, remoteUserId);
-      } catch (_) {
-        // Keep going; periodic polling will still eventually recover.
-      }
-      if (disposed) return;
-
-      if (initiator) {
-        session.startOffer().catch((error) => setFeedback(error.message));
-      }
-
       pollId = setInterval(async () => {
         try {
           const inbox = await apiClient.consumeSignals(identity.id, remoteUserId);
@@ -223,6 +210,10 @@ export default function App() {
           // Silent polling retries keep reconnection simple for MVP.
         }
       }, 1200);
+
+      if (initiator) {
+        session.startOffer().catch((error) => setFeedback(error.message));
+      }
     }
     bootstrapSession();
 
@@ -243,6 +234,7 @@ export default function App() {
       }
       setConnectionState("disconnected");
       connectionStateRef.current = "disconnected";
+      apiClient.flushSignaling(identity.id, remoteUserId).catch(() => {});
     };
   }, [identity, activeContact, addMessage]);
 

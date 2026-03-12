@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.db import get_db
 from app.schemas.signaling import SignalingMessageCreate, SignalingMessageResponse
-from app.services.signaling_service import consume_inbox, create_signal
+from app.services.signaling_service import consume_inbox, create_signal, flush_pair
 
 router = APIRouter(prefix="/signaling", tags=["signaling"])
 
@@ -28,3 +28,14 @@ def get_signaling_inbox(
     db: Session = Depends(get_db),
 ) -> list[SignalingMessageResponse]:
     return consume_inbox(db=db, recipient_id=recipient_id, sender_id=sender_id)
+
+
+@router.delete("/flush/{user_id}/{peer_id}")
+def flush_signaling_pair(
+    user_id: str,
+    peer_id: str,
+    db: Session = Depends(get_db),
+) -> dict:
+    """Delete all signaling messages between two users to allow a clean reconnect."""
+    deleted = flush_pair(db=db, user_id=user_id, peer_id=peer_id)
+    return {"deleted": deleted}

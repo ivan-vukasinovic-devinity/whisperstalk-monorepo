@@ -57,5 +57,8 @@ export const apiClient = {
   consumeSignals(recipientId, senderId) {
     const query = senderId ? `?sender_id=${encodeURIComponent(senderId)}` : "";
     return request(`/signaling/inbox/${recipientId}${query}`);
+  },
+  flushSignaling(userId, peerId) {
+    return request(`/signaling/flush/${userId}/${peerId}`, { method: "DELETE" });
   }
 };
