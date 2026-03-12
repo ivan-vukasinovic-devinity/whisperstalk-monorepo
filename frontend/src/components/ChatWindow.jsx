@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export function ChatWindow({
   contact,
@@ -11,6 +11,11 @@ export function ChatWindow({
   feedback = ""
 }) {
   const [text, setText] = useState("");
+  const messagesEndRef = useRef(null);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
   const statusLabel =
     connectionState === "connected" ? "connected" : peerOnline ? "online" : "offline";
   const statusDotClass =
@@ -69,6 +74,7 @@ export function ChatWindow({
             </div>
           ))
         )}
+        <div ref={messagesEndRef} />
       </div>
       <div className="composer">
         <span className="prompt">{">"}</span>
@@ -76,7 +82,14 @@ export function ChatWindow({
           className="text-input composer-input"
           value={text}
           placeholder="type a message..."
+          enterKeyHint="send"
           onChange={(event) => setText(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" && text.trim()) {
+              onSend(text.trim());
+              setText("");
+            }
+          }}
         />
         <button
           className="btn icon-btn"

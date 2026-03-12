@@ -152,66 +152,18 @@ export default function App() {
   }, [identity, inviteToken]);
 
   useEffect(() => {
-    function setViewportHeight() {
-      const viewportHeight = window.visualViewport?.height || window.innerHeight;
-      document.documentElement.style.setProperty("--app-vh", `${viewportHeight}px`);
-    }
-
-    setViewportHeight();
-    window.addEventListener("resize", setViewportHeight);
-    window.visualViewport?.addEventListener("resize", setViewportHeight);
-    window.visualViewport?.addEventListener("scroll", setViewportHeight);
-
-    return () => {
-      window.removeEventListener("resize", setViewportHeight);
-      window.visualViewport?.removeEventListener("resize", setViewportHeight);
-      window.visualViewport?.removeEventListener("scroll", setViewportHeight);
-    };
-  }, []);
-
-  useEffect(() => {
-    const ua = navigator.userAgent || "";
-    const platform = navigator.platform || "";
-    const isIOS =
-      /iPhone|iPad|iPod/i.test(ua) || (platform === "MacIntel" && navigator.maxTouchPoints > 1);
-    if (!isIOS) return;
-
-    function isComposerField(element) {
-      return (
-        element instanceof HTMLElement &&
-        (element.matches(".composer-input") ||
-          element.matches(".composer input") ||
-          element.matches(".composer textarea"))
-      );
-    }
-
-    function onFocusIn(event) {
-      if (!isComposerField(event.target)) return;
-      document.documentElement.classList.add("composer-focused");
-      requestAnimationFrame(() => {
-        const scroller = document.querySelector(".messages");
-        if (scroller instanceof HTMLElement) {
-          scroller.scrollTop = scroller.scrollHeight;
-        }
-      });
-    }
-
-    function onFocusOut(event) {
-      if (!isComposerField(event.target)) return;
+    function scrollComposerIntoView(event) {
+      if (
+        !(event.target instanceof HTMLElement) ||
+        !event.target.matches(".composer-input")
+      )
+        return;
       setTimeout(() => {
-        if (isComposerField(document.activeElement)) return;
-        document.documentElement.classList.remove("composer-focused");
-      }, 0);
+        event.target.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      }, 300);
     }
-
-    document.addEventListener("focusin", onFocusIn);
-    document.addEventListener("focusout", onFocusOut);
-
-    return () => {
-      document.removeEventListener("focusin", onFocusIn);
-      document.removeEventListener("focusout", onFocusOut);
-      document.documentElement.classList.remove("composer-focused");
-    };
+    document.addEventListener("focusin", scrollComposerIntoView);
+    return () => document.removeEventListener("focusin", scrollComposerIntoView);
   }, []);
 
   useEffect(() => {
