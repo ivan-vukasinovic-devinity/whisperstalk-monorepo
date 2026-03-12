@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 
 export function ChatWindow({
   contact,
-  connectionState,
+  wsConnected = false,
   messages,
   onSend,
   showBack = false,
@@ -15,8 +15,8 @@ export function ChatWindow({
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
-  const statusLabel = connectionState === "connected" ? "connected" : "connecting";
-  const statusDotClass = connectionState === "connected" ? "green" : "yellow";
+  const statusLabel = wsConnected ? "connected" : "reconnecting";
+  const statusDotClass = wsConnected ? "green" : "yellow";
 
   if (!contact) {
     return (
@@ -45,7 +45,7 @@ export function ChatWindow({
         </div>
         {feedback ? <p className="header-feedback">{feedback}</p> : null}
         <div className="chat-header-actions">
-          <span className={`status-pill ${connectionState === "connected" ? "online" : ""}`}>
+          <span className={`status-pill ${wsConnected ? "online" : ""}`}>
             <span className={`dot ${statusDotClass}`} />
             {statusLabel}
           </span>

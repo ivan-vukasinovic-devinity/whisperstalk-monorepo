@@ -31,15 +31,6 @@ export const apiClient = {
   getPendingRequests(userId) {
     return request(`/contacts/requests/pending/${userId}`);
   },
-  sendNudge(senderId, recipientId) {
-    return request("/nudge", {
-      method: "POST",
-      body: JSON.stringify({ sender_id: senderId, recipient_id: recipientId })
-    });
-  },
-  consumeNudges(recipientId) {
-    return request(`/nudge/${recipientId}`);
-  },
   createContactRequest(payload) {
     return request("/contacts/requests", { method: "POST", body: JSON.stringify(payload) });
   },
@@ -61,14 +52,4 @@ export const apiClient = {
       body: JSON.stringify({ user_id: userId })
     });
   },
-  sendSignal(payload) {
-    return request("/signaling", { method: "POST", body: JSON.stringify(payload) });
-  },
-  consumeSignals(recipientId, senderId) {
-    const query = senderId ? `?sender_id=${encodeURIComponent(senderId)}` : "";
-    return request(`/signaling/inbox/${recipientId}${query}`);
-  },
-  flushSignaling(userId, peerId) {
-    return request(`/signaling/flush/${userId}/${peerId}`, { method: "DELETE" });
-  }
 };

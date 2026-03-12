@@ -7,7 +7,6 @@ import { QRCodeCard } from "./components/QRCodeCard";
 import { ScanAddContact } from "./components/ScanAddContact";
 import { useEphemeralMessages } from "./hooks/useEphemeralMessages";
 import { useWhisperSocket } from "./hooks/useWhisperSocket";
-import { createP2PSession } from "./p2p/webrtc";
 
 const SESSION_STORAGE_KEY = "whispers_identity";
 const INVITE_TOKEN_STORAGE_KEY = "whispers_pending_invite_token";
@@ -27,12 +26,9 @@ export default function App() {
   const [contacts, setContacts] = useState([]);
   const [pending, setPending] = useState([]);
   const [activeContact, setActiveContact] = useState(null);
-  const [connectionState, setConnectionState] = useState("disconnected");
   const [nudgeFromSet, setNudgeFromSet] = useState(new Set());
   const [feedback, setFeedback] = useState("");
   const [activeScreen, setActiveScreen] = useState("contacts");
-  const connectionStateRef = useRef("disconnected");
-  const p2pRef = useRef(null);
   const activeContactRef = useRef(null);
   const [inviteToken, setInviteToken] = useState(() => localStorage.getItem(INVITE_TOKEN_STORAGE_KEY) || "");
 
@@ -41,7 +37,7 @@ export default function App() {
     return [identity.id, activeContact.contact_user_id].sort().join("_");
   }, [identity, activeContact]);
 
-  const { messages, addMessage, updateMessage } = useEphemeralMessages(conversationKey);
+  const { messages, addMessage } = useEphemeralMessages(conversationKey);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -72,10 +68,10 @@ export default function App() {
   const handleWsMessage = useCallback((data) => {
     const { type, sender_id } = data;
 
-    if (type === "signal") {
+    if (type === "chat") {
       const current = activeContactRef.current;
-      if (current && sender_id === current.contact_user_id && p2pRef.current) {
-        p2pRef.current.handleSignal(data).catch(() => {});
+      if (current && sender_id === current.contact_user_id) {
+        addMessage({ id: data.id || crypto.randomUUID(), text: data.text, me: false, createdAt: new Date().toISOString() });
       }
       return;
     }
@@ -94,9 +90,9 @@ export default function App() {
         refreshContactsAndPending(identity.id).catch(() => {});
       }
     }
-  }, [identity]);
+  }, [identity, addMessage]);
 
-  const { send: wsSend } = useWhisperSocket(identity?.id, handleWsMessage);
+  const { send: wsSend, connected: wsConnected } = useWhisperSocket(identity?.id, handleWsMessage);
 
   async function refreshContactsAndPending(userId) {
     const [contactsData, pendingData] = await Promise.all([
@@ -203,17 +199,7 @@ export default function App() {
 
   useEffect(() => {
     if (!identity || !activeContact) return;
-    setConnectionState("connecting");
-    connectionStateRef.current = "connecting";
-
-    if (p2pRef.current) {
-      p2pRef.current.destroy();
-      p2pRef.current = null;
-    }
-
     const remoteUserId = activeContact.contact_user_id;
-    const initiator = identity.id < remoteUserId;
-
     wsSend({ type: "nudge", recipient_id: remoteUserId });
     setNudgeFromSet((prev) => {
       if (!prev.has(remoteUserId)) return prev;
@@ -221,106 +207,37 @@ export default function App() {
       next.delete(remoteUserId);
       return next;
     });
-
-    function sendSignalViaWs(signalPayload) {
-      const sent = wsSend({
-        type: "signal",
-        recipient_id: signalPayload.recipient_id,
-        message_type: signalPayload.message_type,
-        payload: signalPayload.payload,
-      });
-      if (!sent) {
-        return apiClient.sendSignal(signalPayload);
-      }
-      return Promise.resolve();
-    }
-
-    const session = createP2PSession({
-      localUserId: identity.id,
-      remoteUserId,
-      initiator,
-      sendSignal: sendSignalViaWs,
-      onDataMessage: (text) => {
-        addMessage({ id: crypto.randomUUID(), text, me: false, createdAt: new Date().toISOString() });
-      },
-      onStateChange: (nextState) => {
-        connectionStateRef.current = nextState;
-        setConnectionState(nextState);
-      }
-    });
-    p2pRef.current = session;
-
-    if (initiator) {
-      session.startOffer().catch((error) => setFeedback(error.message));
-    }
-
-    const renegotiateId = setInterval(() => {
-      if (!initiator) return;
-      if (connectionStateRef.current === "connected") return;
-      session.startOffer({ iceRestart: true }).catch(() => {});
-    }, 6000);
-
-    return () => {
-      clearInterval(renegotiateId);
-      if (p2pRef.current) {
-        p2pRef.current.destroy();
-        p2pRef.current = null;
-      }
-      setConnectionState("disconnected");
-      connectionStateRef.current = "disconnected";
-    };
-  }, [identity, activeContact, addMessage, wsSend]);
-
-  useEffect(() => {
-    if (!activeContact || connectionState !== "connected" || !p2pRef.current) return;
-    const unsentMine = messages
-      .filter((item) => item.me && item.status === "sending")
-      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-
-    for (const message of unsentMine) {
-      try {
-        p2pRef.current.sendText(message.text);
-        updateMessage(message.id, {
-          status: "sent",
-          sentAt: new Date().toISOString()
-        });
-      } catch (_) {
-        break;
-      }
-    }
-  }, [activeContact, connectionState, messages, updateMessage]);
+  }, [identity, activeContact, wsSend]);
 
   function sendMessage(text) {
     if (!activeContact) return;
     const messageId = crypto.randomUUID();
+    const now = new Date().toISOString();
+
+    const sent = wsSend({
+      type: "chat",
+      recipient_id: activeContact.contact_user_id,
+      id: messageId,
+      text,
+    });
+
     addMessage({
       id: messageId,
       text,
       me: true,
-      createdAt: new Date().toISOString(),
-      status: "sending",
-      sentAt: null
+      createdAt: now,
+      status: sent ? "sent" : "failed",
+      sentAt: sent ? now : null,
     });
 
-    if (p2pRef.current && connectionState === "connected") {
-      try {
-        p2pRef.current.sendText(text);
-        updateMessage(messageId, {
-          status: "sent",
-          sentAt: new Date().toISOString()
-        });
-      } catch (_) {
-        setFeedback("Peer is not connected to chat yet. Message queued and will send on reconnect.");
-      }
-    } else {
-      setFeedback("Peer is not connected yet. Message queued and will send on reconnect.");
+    if (!sent) {
+      setFeedback("Not connected to server. Check your connection.");
     }
   }
 
   function logout() {
     setIdentity(null);
     setActiveContact(null);
-    setConnectionState("disconnected");
     setActiveScreen("contacts");
     setFeedback("Logged out.");
   }
@@ -368,7 +285,7 @@ export default function App() {
             <button className="btn auth-submit" disabled={!username.trim() || password.length < 8} onClick={authenticate}>
               {authMode === "signup" ? "Create Account" : "Sign In"}
             </button>
-            <p className="auth-footnote">E2E ENCRYPTED • P2P</p>
+            <p className="auth-footnote">PRIVATE MESSAGING</p>
           </div>
         </section>
       ) : (
@@ -422,7 +339,7 @@ export default function App() {
               ) : null}
 
               <footer className="screen-footer">
-                <span className="sidebar-footnote">E2E ENCRYPTED • P2P</span>
+                <span className="sidebar-footnote">PRIVATE MESSAGING</span>
                 <button className="icon-action" onClick={() => setActiveScreen("settings")} aria-label="Open settings">
                   ⚙
                 </button>
@@ -434,7 +351,7 @@ export default function App() {
             <section className="chat-screen">
               <ChatWindow
                 contact={activeContact}
-                connectionState={connectionState}
+                wsConnected={wsConnected}
                 messages={messages}
                 onSend={sendMessage}
                 showBack={true}

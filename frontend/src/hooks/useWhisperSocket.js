@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
 
@@ -13,13 +13,17 @@ export function useWhisperSocket(userId, onMessage) {
   const wsRef = useRef(null);
   const onMessageRef = useRef(onMessage);
   const reconnectTimer = useRef(null);
+  const [connected, setConnected] = useState(false);
 
   useEffect(() => {
     onMessageRef.current = onMessage;
   }, [onMessage]);
 
   useEffect(() => {
-    if (!userId) return;
+    if (!userId) {
+      setConnected(false);
+      return;
+    }
     let disposed = false;
 
     function connect() {
@@ -30,6 +34,7 @@ export function useWhisperSocket(userId, onMessage) {
 
       ws.onopen = () => {
         clearTimeout(reconnectTimer.current);
+        setConnected(true);
       };
 
       ws.onmessage = (event) => {
@@ -43,6 +48,7 @@ export function useWhisperSocket(userId, onMessage) {
 
       ws.onclose = () => {
         wsRef.current = null;
+        setConnected(false);
         if (!disposed) {
           reconnectTimer.current = setTimeout(connect, 2000);
         }
@@ -62,6 +68,7 @@ export function useWhisperSocket(userId, onMessage) {
         wsRef.current.close();
         wsRef.current = null;
       }
+      setConnected(false);
     };
   }, [userId]);
 
@@ -74,5 +81,5 @@ export function useWhisperSocket(userId, onMessage) {
     return false;
   }, []);
 
-  return { send };
+  return { send, connected };
 }
