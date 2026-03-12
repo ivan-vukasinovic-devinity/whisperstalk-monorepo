@@ -93,6 +93,8 @@ export default function App() {
     }
 
     if (type === "nudge") {
+      const current = activeContactRef.current;
+      if (current && sender_id === current.contact_user_id) return;
       setUnreadMap((prev) => {
         if (prev.has(sender_id)) return prev;
         const next = new Map(prev);
