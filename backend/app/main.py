@@ -14,6 +14,7 @@ from app.routes.nudge import router as nudge_router
 from app.routes.presence import router as presence_router
 from app.routes.signaling import router as signaling_router
 from app.routes.users import router as users_router
+from app.routes.ws import router as ws_router
 from app.utils.error_handlers import register_exception_handlers
 
 settings = get_settings()
@@ -57,6 +58,7 @@ app.include_router(contacts_router, prefix=settings.api_v1_prefix)
 app.include_router(presence_router, prefix=settings.api_v1_prefix)
 app.include_router(signaling_router, prefix=settings.api_v1_prefix)
 app.include_router(nudge_router, prefix=settings.api_v1_prefix)
+app.include_router(ws_router)
 
 
 @app.on_event("startup")
