@@ -33,11 +33,13 @@ export function useWhisperSocket(userId, onMessage) {
       wsRef.current = ws;
 
       ws.onopen = () => {
+        if (wsRef.current !== ws) return;
         clearTimeout(reconnectTimer.current);
         setConnected(true);
       };
 
       ws.onmessage = (event) => {
+        if (wsRef.current !== ws) return;
         try {
           const data = JSON.parse(event.data);
           onMessageRef.current?.(data);
@@ -47,6 +49,7 @@ export function useWhisperSocket(userId, onMessage) {
       };
 
       ws.onclose = () => {
+        if (wsRef.current !== ws) return;
         wsRef.current = null;
         setConnected(false);
         if (!disposed) {
