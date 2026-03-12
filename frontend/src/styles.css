@@ -24,7 +24,7 @@ body {
 }
 
 .auth-screen {
-  min-height: calc(100vh - 36px);
+  min-height: 100%;
   display: grid;
   place-items: center;
 }
@@ -493,7 +493,8 @@ body {
 .app-shell {
   height: 100dvh;
   min-height: 100dvh;
-  overflow: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   padding: 0;
   background: transparent;
 }
@@ -757,7 +758,6 @@ body {
   flex-shrink: 0;
   z-index: 3;
 }
-
 
 .prompt {
   color: #6c5cff;
