@@ -10,9 +10,6 @@ from app.config import get_settings
 from app.db import Base, engine
 from app.routes.auth import router as auth_router
 from app.routes.contacts import router as contacts_router
-from app.routes.nudge import router as nudge_router
-from app.routes.presence import router as presence_router
-from app.routes.signaling import router as signaling_router
 from app.routes.users import router as users_router
 from app.routes.ws import router as ws_router
 from app.utils.error_handlers import register_exception_handlers
@@ -21,26 +18,6 @@ settings = get_settings()
 app = FastAPI(title=settings.app_name)
 
 
-def _run_migrations(connection) -> None:
-    """Add columns that create_all won't add to existing tables."""
-    migrations = [
-        (
-            "presence",
-            "active_chat_with",
-            "ALTER TABLE presence ADD COLUMN active_chat_with VARCHAR(36)",
-        ),
-    ]
-    for table, column, ddl in migrations:
-        result = connection.execute(
-            text(
-                "SELECT 1 FROM information_schema.columns "
-                "WHERE table_name = :table AND column_name = :column"
-            ),
-            {"table": table, "column": column},
-        )
-        if result.fetchone() is None:
-            connection.execute(text(ddl))
-            logging.getLogger(__name__).info("Migration: added %s.%s", table, column)
 logger = logging.getLogger(__name__)
 
 app.add_middleware(
@@ -55,9 +32,6 @@ register_exception_handlers(app)
 app.include_router(auth_router, prefix=settings.api_v1_prefix)
 app.include_router(users_router, prefix=settings.api_v1_prefix)
 app.include_router(contacts_router, prefix=settings.api_v1_prefix)
-app.include_router(presence_router, prefix=settings.api_v1_prefix)
-app.include_router(signaling_router, prefix=settings.api_v1_prefix)
-app.include_router(nudge_router, prefix=settings.api_v1_prefix)
 app.include_router(ws_router)
 
 
@@ -69,8 +43,6 @@ async def initialize_database() -> None:
             with engine.begin() as connection:
                 connection.execute(text("SELECT 1"))
             Base.metadata.create_all(bind=engine)
-            with engine.begin() as connection:
-                _run_migrations(connection)
             logger.info("Database is ready and schema initialized.")
             return
         except SQLAlchemyError as exc:

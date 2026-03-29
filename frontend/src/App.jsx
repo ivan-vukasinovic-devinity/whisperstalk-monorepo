@@ -7,6 +7,7 @@ import { QRCodeCard } from "./components/QRCodeCard";
 import { ScanAddContact } from "./components/ScanAddContact";
 import { useEphemeralMessages } from "./hooks/useEphemeralMessages";
 import { useWhisperSocket } from "./hooks/useWhisperSocket";
+import { encrypt, decrypt } from "./utils/crypto";
 
 const SESSION_STORAGE_KEY = "whispers_identity";
 const INVITE_TOKEN_STORAGE_KEY = "whispers_pending_invite_token";
@@ -31,6 +32,14 @@ export default function App() {
   const [activeScreen, setActiveScreen] = useState("contacts");
   const activeContactRef = useRef(null);
   const [inviteToken, setInviteToken] = useState(() => localStorage.getItem(INVITE_TOKEN_STORAGE_KEY) || "");
+  const [passcodeMap, setPasscodeMap] = useState(() => {
+    try { return new Map(JSON.parse(localStorage.getItem("whispers_passcodes") || "[]")); }
+    catch (_) { return new Map(); }
+  });
+
+  useEffect(() => {
+    localStorage.setItem("whispers_passcodes", JSON.stringify([...passcodeMap]));
+  }, [passcodeMap]);
 
   const conversationKey = useMemo(() => {
     if (!identity || !activeContact) return null;
@@ -65,30 +74,64 @@ export default function App() {
     activeContactRef.current = activeContact;
   }, [activeContact]);
 
+  const passcodeMapRef = useRef(passcodeMap);
+  useEffect(() => { passcodeMapRef.current = passcodeMap; }, [passcodeMap]);
+
   const handleWsMessage = useCallback((data) => {
     const { type, sender_id } = data;
 
     if (type === "chat") {
       if (!identity) return;
-      const msg = { id: data.id || crypto.randomUUID(), text: data.text, me: false, createdAt: new Date().toISOString() };
-      const current = activeContactRef.current;
 
-      if (current && sender_id === current.contact_user_id) {
-        addMessage(msg);
-      } else {
-        const convKey = [identity.id, sender_id].sort().join("_");
-        const storeKey = `whispers_msgs_${convKey}`;
-        try {
-          const existing = JSON.parse(localStorage.getItem(storeKey) || "[]");
-          existing.push(msg);
-          localStorage.setItem(storeKey, JSON.stringify(existing));
-        } catch (_) { /* storage full or corrupt — non-fatal */ }
-        setUnreadMap((prev) => {
-          const next = new Map(prev);
-          next.set(sender_id, (prev.get(sender_id) || 0) + 1);
-          return next;
-        });
+      async function processChat() {
+        let text = data.text;
+        let encrypted = false;
+        let decryptFailed = false;
+
+        if (data.encrypted) {
+          encrypted = true;
+          const convKey = [identity.id, sender_id].sort().join("_");
+          const passcode = passcodeMapRef.current.get(convKey);
+          if (passcode) {
+            try { text = await decrypt(data.text, passcode); }
+            catch (_) { text = data.text; decryptFailed = true; }
+          } else {
+            decryptFailed = true;
+          }
+        }
+
+        const msg = {
+          id: data.id || globalThis.crypto.randomUUID(),
+          text,
+          me: false,
+          createdAt: new Date().toISOString(),
+          encrypted,
+          decryptFailed,
+        };
+        const current = activeContactRef.current;
+
+        if (current && sender_id === current.contact_user_id) {
+          addMessage(msg);
+        } else {
+          const convKey = [identity.id, sender_id].sort().join("_");
+          const storeKey = `whispers_msgs_${convKey}`;
+          try {
+            const existing = JSON.parse(localStorage.getItem(storeKey) || "[]");
+            existing.push(msg);
+            localStorage.setItem(storeKey, JSON.stringify(existing));
+          } catch (_) { /* storage full or corrupt — non-fatal */ }
+          setUnreadMap((prev) => {
+            const next = new Map(prev);
+            next.set(sender_id, (prev.get(sender_id) || 0) + 1);
+            return next;
+          });
+        }
       }
+      processChat();
+      return;
+    }
+
+    if (type === "ack") {
       return;
     }
 
@@ -228,16 +271,25 @@ export default function App() {
     });
   }, [identity, activeContact, wsSend]);
 
-  function sendMessage(text) {
+  async function sendMessage(text) {
     if (!activeContact) return;
-    const messageId = crypto.randomUUID();
+    const messageId = globalThis.crypto.randomUUID();
     const now = new Date().toISOString();
+    const passcode = conversationKey ? passcodeMap.get(conversationKey) : null;
+    const isEncrypted = !!passcode;
+
+    let payload = text;
+    if (isEncrypted) {
+      try { payload = await encrypt(text, passcode); }
+      catch (_) { setFeedback("Encryption failed."); return; }
+    }
 
     const sent = wsSend({
       type: "chat",
       recipient_id: activeContact.contact_user_id,
       id: messageId,
-      text,
+      text: payload,
+      encrypted: isEncrypted,
     });
 
     addMessage({
@@ -245,12 +297,13 @@ export default function App() {
       text,
       me: true,
       createdAt: now,
-      status: sent ? "sent" : "failed",
+      status: sent ? "sent" : "pending",
       sentAt: sent ? now : null,
+      encrypted: isEncrypted,
     });
 
     if (!sent) {
-      setFeedback("Not connected to server. Check your connection.");
+      setFeedback("You're offline. Message will be sent when you reconnect.");
     }
   }
 
@@ -376,6 +429,17 @@ export default function App() {
                 showBack={true}
                 onBack={() => { setActiveContact(null); setActiveScreen("contacts"); }}
                 feedback={feedback}
+                encrypted={!!(conversationKey && passcodeMap.get(conversationKey))}
+                onSetPasscode={(code) => {
+                  if (!conversationKey) return;
+                  setPasscodeMap((prev) => { const next = new Map(prev); next.set(conversationKey, code); return next; });
+                  setFeedback("Encryption enabled. Both users must enter the same passcode.");
+                }}
+                onClearPasscode={() => {
+                  if (!conversationKey) return;
+                  setPasscodeMap((prev) => { const next = new Map(prev); next.delete(conversationKey); return next; });
+                  setFeedback("Encryption disabled.");
+                }}
               />
             </section>
           ) : null}
