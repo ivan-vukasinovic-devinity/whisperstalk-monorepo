@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 from typing import Dict
@@ -118,7 +119,9 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str):
     connections[user_id] = websocket
     logger.info("WS connected: %s (total: %d)", user_id, len(connections))
 
-    pending = _fetch_and_delete_pending(user_id)
+    pending = await asyncio.get_event_loop().run_in_executor(
+        None, _fetch_and_delete_pending, user_id
+    )
     for msg in pending:
         try:
             await websocket.send_json(msg)
@@ -144,7 +147,9 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str):
             delivered = await send_to_user(recipient_id, data)
 
             if not delivered and msg_type in STORE_TYPES:
-                _store_pending(user_id, recipient_id, data)
+                await asyncio.get_event_loop().run_in_executor(
+                    None, _store_pending, user_id, recipient_id, data
+                )
 
             if msg_type == "chat":
                 await websocket.send_json(
