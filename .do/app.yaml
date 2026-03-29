@@ -20,7 +20,7 @@ services:
         value: /api/v1
       - key: CORS_ORIGINS
         scope: RUN_TIME
-        value: https://your-frontend-domain.com
+        value: https://xwhispers.com,https://www.xwhispers.com,https://whale-app-6lk93.ondigitalocean.app,http://localhost:5173,http://localhost:3000
       - key: DATABASE_URL
         scope: RUN_TIME
         type: SECRET
@@ -41,7 +41,7 @@ static_sites:
     envs:
       - key: VITE_API_URL
         scope: BUILD_TIME
-        value: https://your-backend-domain.com/api/v1
+        value: https://whale-app-6lk93.ondigitalocean.app/api/v1
     routes:
       - path: /
 databases:

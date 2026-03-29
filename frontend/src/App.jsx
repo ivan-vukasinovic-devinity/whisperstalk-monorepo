@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { apiClient, setStoredToken, getStoredToken } from "./api/client";
 import { ChatWindow } from "./components/ChatWindow";
 import { ContactList } from "./components/ContactList";
+import { LandingPage } from "./components/LandingPage";
 import { QRCodeCard } from "./components/QRCodeCard";
 import { ScanAddContact } from "./components/ScanAddContact";
 import { useEphemeralMessages } from "./hooks/useEphemeralMessages";
@@ -23,6 +24,7 @@ export default function App() {
       return null;
     }
   });
+  const [showAuth, setShowAuth] = useState(false);
   const [authMode, setAuthMode] = useState("signup");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -97,8 +99,13 @@ export default function App() {
           const passcode = passcodeMapRef.current.get(convKey);
           if (passcode) {
             try { text = await decrypt(data.text, passcode); }
-            catch (_) { text = data.text; decryptFailed = true; }
+            catch (e) {
+              console.warn("Decrypt failed:", e.message, "payload length:", data.text?.length);
+              text = data.text;
+              decryptFailed = true;
+            }
           } else {
+            console.warn("No passcode set for conversation", convKey);
             decryptFailed = true;
           }
         }
@@ -325,49 +332,54 @@ export default function App() {
   return (
     <main className="app-shell">
       {!identity ? (
-        <section className="auth-screen">
-          <div className="auth-card">
-            <div className="brand-block">
-              <h1>WhisperTalk</h1>
-              <p>Private messaging</p>
-            </div>
+        !showAuth ? (
+          <LandingPage onGetStarted={() => setShowAuth(true)} />
+        ) : (
+          <section className="auth-screen">
+            <div className="auth-card">
+              <button className="landing-back-btn" onClick={() => setShowAuth(false)}>← Back</button>
+              <div className="brand-block">
+                <h1>WhisperTalk</h1>
+                <p>Private messaging</p>
+              </div>
 
-            <div className="auth-toggle">
-              <button className={`btn small ${authMode === "signup" ? "" : "ghost"}`} onClick={() => setAuthMode("signup")}>
-                Sign Up
-              </button>
-              <button className={`btn small ${authMode === "login" ? "" : "ghost"}`} onClick={() => setAuthMode("login")}>
-                Login
-              </button>
-            </div>
+              <div className="auth-toggle">
+                <button className={`btn small ${authMode === "signup" ? "" : "ghost"}`} onClick={() => setAuthMode("signup")}>
+                  Sign Up
+                </button>
+                <button className={`btn small ${authMode === "login" ? "" : "ghost"}`} onClick={() => setAuthMode("login")}>
+                  Login
+                </button>
+              </div>
 
-            <label className="field-label" htmlFor="username">
-              Username
-            </label>
-            <input
-              id="username"
-              className="text-input"
-              placeholder="Enter username"
-              value={username}
-              onChange={(event) => setUsername(event.target.value)}
-            />
-            <label className="field-label" htmlFor="password">
-              Password
-            </label>
-            <input
-              id="password"
-              className="text-input"
-              type="password"
-              placeholder="Enter password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-            />
-            <button className="btn auth-submit" disabled={!username.trim() || password.length < 8} onClick={authenticate}>
-              {authMode === "signup" ? "Create Account" : "Sign In"}
-            </button>
-            <p className="auth-footnote">PRIVATE MESSAGING</p>
-          </div>
-        </section>
+              <label className="field-label" htmlFor="username">
+                Username
+              </label>
+              <input
+                id="username"
+                className="text-input"
+                placeholder="Enter username"
+                value={username}
+                onChange={(event) => setUsername(event.target.value)}
+              />
+              <label className="field-label" htmlFor="password">
+                Password
+              </label>
+              <input
+                id="password"
+                className="text-input"
+                type="password"
+                placeholder="Enter password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+              />
+              <button className="btn auth-submit" disabled={!username.trim() || password.length < 8} onClick={authenticate}>
+                {authMode === "signup" ? "Create Account" : "Sign In"}
+              </button>
+              <p className="auth-footnote">PRIVATE MESSAGING</p>
+            </div>
+          </section>
+        )
       ) : (
         <section className="mobile-app-shell">
           {activeScreen === "contacts" ? (
