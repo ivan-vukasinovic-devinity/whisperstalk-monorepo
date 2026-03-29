@@ -9,7 +9,10 @@ class Settings(BaseSettings):
     api_v1_prefix: str = "/api/v1"
     database_url: str = "postgresql+psycopg2://postgres:postgres@localhost:5432/whispers"
     cors_origins: str = (
-        "http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:3000"
+        "https://xwhispers.com,https://www.xwhispers.com,"
+        "https://whale-app-6lk93.ondigitalocean.app,"
+        "http://localhost:5173,http://127.0.0.1:5173,"
+        "http://localhost:3000,http://127.0.0.1:3000"
     )
     jwt_secret: str = "change-me-in-production"
     jwt_expiry_hours: int = 24
