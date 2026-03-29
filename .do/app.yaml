@@ -25,6 +25,10 @@ services:
         scope: RUN_TIME
         type: SECRET
         value: ${db.DATABASE_URL}
+      - key: JWT_SECRET
+        scope: RUN_TIME
+        type: SECRET
+        value: wh1sp3r-t4lk-pr0d-s3cr3t-k3y-2026
 static_sites:
   - name: frontend
     github:

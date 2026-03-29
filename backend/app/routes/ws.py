@@ -2,11 +2,13 @@ import json
 import logging
 from typing import Dict
 
+import jwt
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from sqlalchemy import delete, select
 
 from app.db import SessionLocal
 from app.models.pending_message import PendingMessage
+from app.utils.security import decode_access_token
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -87,6 +89,23 @@ async def send_to_user(user_id: str, message: dict) -> bool:
 
 @router.websocket("/ws/{user_id}")
 async def websocket_endpoint(websocket: WebSocket, user_id: str):
+    token = websocket.query_params.get("token")
+    if not token:
+        await websocket.close(code=4001, reason="Missing token")
+        return
+    try:
+        payload = decode_access_token(token)
+        token_user_id = payload["sub"]
+    except (jwt.ExpiredSignatureError, jwt.InvalidTokenError) as exc:
+        await websocket.accept()
+        await websocket.close(code=4001, reason=str(exc))
+        return
+
+    if token_user_id != user_id:
+        await websocket.accept()
+        await websocket.close(code=4001, reason="Token user mismatch")
+        return
+
     await websocket.accept()
 
     old = connections.pop(user_id, None)

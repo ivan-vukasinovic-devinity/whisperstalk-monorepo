@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { getStoredToken } from "../api/client";
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
 
-function buildWsUrl(userId) {
+function buildWsUrl(userId, token) {
   const base = API_BASE.replace(/\/api\/v1\/?$/, "");
   const protocol = base.startsWith("https") ? "wss" : "ws";
   const host = base.replace(/^https?:\/\//, "");
-  return `${protocol}://${host}/ws/${userId}`;
+  return `${protocol}://${host}/ws/${userId}?token=${encodeURIComponent(token)}`;
 }
 
 export function useWhisperSocket(userId, onMessage) {
@@ -28,7 +29,9 @@ export function useWhisperSocket(userId, onMessage) {
 
     function connect() {
       if (disposed) return;
-      const url = buildWsUrl(userId);
+      const token = getStoredToken();
+      if (!token) return;
+      const url = buildWsUrl(userId, token);
       const ws = new WebSocket(url);
       wsRef.current = ws;
 

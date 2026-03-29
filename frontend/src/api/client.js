@@ -1,17 +1,39 @@
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
 
+const TOKEN_KEY = "whispers_token";
+
+export function getStoredToken() {
+  return localStorage.getItem(TOKEN_KEY);
+}
+
+export function setStoredToken(token) {
+  if (token) localStorage.setItem(TOKEN_KEY, token);
+  else localStorage.removeItem(TOKEN_KEY);
+}
+
 async function request(path, options = {}) {
+  const token = getStoredToken();
+  const headers = {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(options.headers || {}),
+  };
+
   const response = await fetch(`${API_BASE_URL}${path}`, {
-    headers: {
-      "Content-Type": "application/json",
-      ...(options.headers || {})
-    },
-    ...options
+    ...options,
+    headers,
   });
+
+  if (response.status === 401) {
+    setStoredToken(null);
+    const err = new Error("Session expired. Please log in again.");
+    err.status = 401;
+    throw err;
+  }
 
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
-    const message = body?.message || `Request failed: ${response.status}`;
+    const message = body?.detail || body?.message || `Request failed: ${response.status}`;
     throw new Error(message);
   }
 

@@ -11,6 +11,8 @@ class Settings(BaseSettings):
     cors_origins: str = (
         "http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:3000"
     )
+    jwt_secret: str = "change-me-in-production"
+    jwt_expiry_hours: int = 24
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 

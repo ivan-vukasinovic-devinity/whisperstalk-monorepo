@@ -22,8 +22,9 @@ from app.services.contact_service import (
     list_pending_requests_for_user,
     reject_contact_request,
 )
+from app.utils.auth_dep import get_current_user
 
-router = APIRouter(prefix="/contacts", tags=["contacts"])
+router = APIRouter(prefix="/contacts", tags=["contacts"], dependencies=[Depends(get_current_user)])
 _logger = logging.getLogger(__name__)
 
 

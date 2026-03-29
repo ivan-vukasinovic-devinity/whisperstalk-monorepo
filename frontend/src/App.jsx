@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { apiClient } from "./api/client";
+import { apiClient, setStoredToken, getStoredToken } from "./api/client";
 import { ChatWindow } from "./components/ChatWindow";
 import { ContactList } from "./components/ContactList";
 import { QRCodeCard } from "./components/QRCodeCard";
@@ -16,7 +16,9 @@ export default function App() {
   const [identity, setIdentity] = useState(() => {
     try {
       const raw = localStorage.getItem(SESSION_STORAGE_KEY);
-      return raw ? JSON.parse(raw) : null;
+      if (!raw) return null;
+      if (!getStoredToken()) return null;
+      return JSON.parse(raw);
     } catch (_) {
       return null;
     }
@@ -65,6 +67,7 @@ export default function App() {
   useEffect(() => {
     if (!identity) {
       localStorage.removeItem(SESSION_STORAGE_KEY);
+      setStoredToken(null);
       return;
     }
     localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(identity));
@@ -168,11 +171,12 @@ export default function App() {
   async function authenticate() {
     try {
       const payload = { username: username.trim(), password };
-      const user = authMode === "signup" ? await apiClient.signup(payload) : await apiClient.login(payload);
-      setIdentity(user);
+      const result = authMode === "signup" ? await apiClient.signup(payload) : await apiClient.login(payload);
+      setStoredToken(result.token);
+      setIdentity(result.user);
       setActiveScreen("contacts");
       setFeedback(authMode === "signup" ? "Account created. Share your QR code." : "Logged in.");
-      await refreshContactsAndPending(user.id);
+      await refreshContactsAndPending(result.user.id);
     } catch (error) {
       setFeedback(error.message);
     }
@@ -226,9 +230,12 @@ export default function App() {
 
   useEffect(() => {
     if (!identity) return;
-    refreshContactsAndPending(identity.id).catch(() => {
-      setFeedback("Session is stale. Please log in again.");
-      setIdentity(null);
+    refreshContactsAndPending(identity.id).catch((err) => {
+      if (err?.status === 401 || !getStoredToken()) {
+        setStoredToken(null);
+        setIdentity(null);
+        setFeedback("Session expired. Please log in again.");
+      }
     });
   }, [identity]);
 
@@ -308,6 +315,7 @@ export default function App() {
   }
 
   function logout() {
+    setStoredToken(null);
     setIdentity(null);
     setActiveContact(null);
     setActiveScreen("contacts");
