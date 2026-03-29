@@ -85,6 +85,11 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str):
             data["sender_id"] = user_id
 
             delivered = await send_to_user(recipient_id, data)
+            logger.info(
+                "MSG %s -> %s type=%s delivered=%s (online: %s)",
+                user_id[:8], recipient_id[:8], msg_type, delivered,
+                list(connections.keys()),
+            )
 
             if not delivered and msg_type in STORE_TYPES:
                 pending[recipient_id].append(data)

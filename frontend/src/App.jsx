@@ -25,7 +25,7 @@ export default function App() {
     }
   });
   const [showAuth, setShowAuth] = useState(false);
-  const [authMode, setAuthMode] = useState("signup");
+  const [authMode, setAuthMode] = useState("login");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [contacts, setContacts] = useState([]);
@@ -34,6 +34,7 @@ export default function App() {
   const [unreadMap, setUnreadMap] = useState(new Map());
   const [feedback, setFeedback] = useState("");
   const [activeScreen, setActiveScreen] = useState("contacts");
+  const [contactSearch, setContactSearch] = useState("");
   const activeContactRef = useRef(null);
   const [inviteToken, setInviteToken] = useState(() => localStorage.getItem(INVITE_TOKEN_STORAGE_KEY) || "");
   const [passcodeMap, setPasscodeMap] = useState(() => {
@@ -50,7 +51,8 @@ export default function App() {
     return [identity.id, activeContact.contact_user_id].sort().join("_");
   }, [identity, activeContact]);
 
-  const { messages, addMessage } = useEphemeralMessages(conversationKey);
+  const { messages, addMessage, updateMessage, clearMessages } = useEphemeralMessages(conversationKey);
+  const ackTimers = useRef({});
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -142,6 +144,14 @@ export default function App() {
     }
 
     if (type === "ack") {
+      const msgId = data.id;
+      if (msgId && ackTimers.current[msgId]) {
+        clearTimeout(ackTimers.current[msgId]);
+        delete ackTimers.current[msgId];
+      }
+      if (msgId) {
+        updateMessage(msgId, { status: "sent", sentAt: new Date().toISOString() });
+      }
       return;
     }
 
@@ -162,7 +172,7 @@ export default function App() {
         refreshContactsAndPending(identity.id).catch(() => {});
       }
     }
-  }, [identity, addMessage]);
+  }, [identity, addMessage, updateMessage]);
 
   const { send: wsSend, connected: wsConnected } = useWhisperSocket(identity?.id, handleWsMessage);
 
@@ -311,13 +321,44 @@ export default function App() {
       text,
       me: true,
       createdAt: now,
-      status: sent ? "sent" : "pending",
-      sentAt: sent ? now : null,
+      status: sent ? "sending" : "failed",
+      sentAt: null,
       encrypted: isEncrypted,
     });
 
-    if (!sent) {
-      setFeedback("You're offline. Message will be sent when you reconnect.");
+    if (sent) {
+      ackTimers.current[messageId] = setTimeout(() => {
+        delete ackTimers.current[messageId];
+        updateMessage(messageId, { status: "failed" });
+      }, 5000);
+    } else {
+      setFeedback("You're offline. Tap failed messages to retry.");
+    }
+  }
+
+  async function retryMessage(message) {
+    if (!activeContact) return;
+    let payload = message.text;
+    if (message.encrypted) {
+      const passcode = conversationKey ? passcodeMap.get(conversationKey) : null;
+      if (passcode) {
+        try { payload = await encrypt(message.text, passcode); }
+        catch (_) { setFeedback("Encryption failed."); return; }
+      }
+    }
+    const sent = wsSend({
+      type: "chat",
+      recipient_id: activeContact.contact_user_id,
+      id: message.id,
+      text: payload,
+      encrypted: message.encrypted || false,
+    });
+    if (sent) {
+      updateMessage(message.id, { status: "sending" });
+      ackTimers.current[message.id] = setTimeout(() => {
+        delete ackTimers.current[message.id];
+        updateMessage(message.id, { status: "failed" });
+      }, 5000);
     }
   }
 
@@ -344,11 +385,11 @@ export default function App() {
               </div>
 
               <div className="auth-toggle">
-                <button className={`btn small ${authMode === "signup" ? "" : "ghost"}`} onClick={() => setAuthMode("signup")}>
-                  Sign Up
-                </button>
                 <button className={`btn small ${authMode === "login" ? "" : "ghost"}`} onClick={() => setAuthMode("login")}>
                   Login
+                </button>
+                <button className={`btn small ${authMode === "signup" ? "" : "ghost"}`} onClick={() => setAuthMode("signup")}>
+                  Sign Up
                 </button>
               </div>
 
@@ -387,7 +428,10 @@ export default function App() {
               <header className="contacts-header">
                 <div className="brand-inline">
                   <span className="brand-icon">◯</span>
-                  <h2>WhisperTalk</h2>
+                  <div>
+                    <h2>WhisperTalk</h2>
+                    <span className="brand-username">{identity.username}</span>
+                  </div>
                 </div>
                 <div className="contacts-header-actions">
                   <button className="icon-action" onClick={() => setActiveScreen("add-contact")} aria-label="Add contact">
@@ -396,13 +440,36 @@ export default function App() {
                 </div>
               </header>
 
-              <div className="contacts-identity">$ {identity.username}</div>
+              <div className="contact-search-bar">
+                <svg className="contact-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                </svg>
+                <input
+                  className="contact-search-input"
+                  type="text"
+                  placeholder="Search contacts..."
+                  value={contactSearch}
+                  onChange={(e) => setContactSearch(e.target.value)}
+                />
+                {contactSearch && (
+                  <button className="contact-search-clear" onClick={() => setContactSearch("")} aria-label="Clear search">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                  </button>
+                )}
+              </div>
+
               <ContactList
-                contacts={contacts}
+                contacts={contactSearch.trim()
+                  ? contacts.filter((c) => {
+                      const q = contactSearch.trim().toLowerCase();
+                      return (c.alias || "").toLowerCase().includes(q) || (c.display_name || "").toLowerCase().includes(q);
+                    })
+                  : contacts}
                 activeContactId={activeContact?.contact_user_id}
                 onSelect={(contact) => {
                   setActiveContact(contact);
                   setActiveScreen("chat");
+                  setContactSearch("");
                 }}
                 unreadMap={unreadMap}
               />
@@ -431,7 +498,7 @@ export default function App() {
               ) : null}
 
               <footer className="screen-footer">
-                <span className="sidebar-footnote">PRIVATE MESSAGING</span>
+                <span className="sidebar-footnote">E2E ENCRYPTED</span>
                 <button className="icon-action" onClick={() => setActiveScreen("settings")} aria-label="Open settings">
                   ⚙
                 </button>
@@ -446,6 +513,8 @@ export default function App() {
                 wsConnected={wsConnected}
                 messages={messages}
                 onSend={sendMessage}
+                onRetry={retryMessage}
+                onDeleteMessages={clearMessages}
                 showBack={true}
                 onBack={() => { setActiveContact(null); setActiveScreen("contacts"); }}
                 feedback={feedback}

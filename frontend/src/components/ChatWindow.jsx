@@ -5,6 +5,8 @@ export function ChatWindow({
   wsConnected = false,
   messages,
   onSend,
+  onRetry,
+  onDeleteMessages,
   showBack = false,
   onBack = null,
   feedback = "",
@@ -60,7 +62,7 @@ export function ChatWindow({
         {feedback ? <p className="header-feedback">{feedback}</p> : null}
         <div className="chat-header-actions">
           <button
-            className={`icon-action encryption-toggle ${encrypted ? "encrypted" : ""}`}
+            className={`encryption-toggle-btn ${encrypted ? "encrypted" : ""}`}
             onClick={() => {
               if (encrypted) {
                 onClearPasscode?.();
@@ -72,17 +74,34 @@ export function ChatWindow({
             title={encrypted ? "Encrypted — tap to disable" : "Not encrypted — tap to set passcode"}
           >
             {encrypted ? (
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2.5" ry="2.5"/>
                 <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                <circle cx="12" cy="16.5" r="1.5" fill="currentColor" stroke="none"/>
               </svg>
             ) : (
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2.5" ry="2.5"/>
                 <path d="M7 11V7a5 5 0 0 1 9.9-1"/>
               </svg>
             )}
           </button>
+          {messages.length > 0 && (
+            <button
+              className="icon-action delete-messages-btn"
+              onClick={() => { if (window.confirm("Delete all messages in this chat?")) onDeleteMessages?.(); }}
+              aria-label="Delete all messages"
+              title="Delete all messages"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="3 6 5 6 21 6"/>
+                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                <path d="M10 11v6"/>
+                <path d="M14 11v6"/>
+                <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+              </svg>
+            </button>
+          )}
           <span className={`status-pill ${wsConnected ? "online" : ""}`}>
             <span className={`dot ${statusDotClass}`} />
             {statusLabel}
@@ -124,19 +143,31 @@ export function ChatWindow({
         {messages.length === 0 ? (
           <p className="muted">No messages in the last 12h.</p>
         ) : (
-          messages.map((message) => (
-            <div key={message.id} className={`bubble ${message.me ? "me" : "peer"} ${message.decryptFailed ? "decrypt-failed" : ""}`}>
-              <div>{message.decryptFailed ? "🔒 Unable to decrypt" : message.text}</div>
-              <small>
-                {message.me
-                  ? message.status === "pending"
-                    ? "queued"
-                    : `sent · ${new Date(message.sentAt || message.createdAt).toLocaleTimeString()}`
-                  : new Date(message.createdAt).toLocaleTimeString()}
-                {message.encrypted ? " · 🔒" : ""}
-              </small>
-            </div>
-          ))
+          messages.map((message) => {
+            const isFailed = message.me && message.status === "failed";
+            const isSending = message.me && message.status === "sending";
+            return (
+              <div
+                key={message.id}
+                className={`bubble ${message.me ? "me" : "peer"} ${message.decryptFailed ? "decrypt-failed" : ""} ${isFailed ? "failed" : ""}`}
+                onClick={isFailed && onRetry ? () => onRetry(message) : undefined}
+                role={isFailed ? "button" : undefined}
+                tabIndex={isFailed ? 0 : undefined}
+              >
+                <div>{message.decryptFailed ? "🔒 Unable to decrypt" : message.text}</div>
+                <small>
+                  {message.me
+                    ? isSending
+                      ? "sending..."
+                      : isFailed
+                        ? "failed — tap to retry"
+                        : `sent · ${new Date(message.sentAt || message.createdAt).toLocaleTimeString()}`
+                    : new Date(message.createdAt).toLocaleTimeString()}
+                  {message.encrypted ? " · 🔒" : ""}
+                </small>
+              </div>
+            );
+          })
         )}
         <div ref={messagesEndRef} />
       </div>

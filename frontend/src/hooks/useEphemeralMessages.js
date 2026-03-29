@@ -58,5 +58,12 @@ export function useEphemeralMessages(conversationKey) {
     );
   }, []);
 
-  return { messages, addMessage, updateMessage };
+  const clearMessages = useCallback(() => {
+    setMessages([]);
+    if (conversationKey) {
+      localStorage.removeItem(`whispers_msgs_${conversationKey}`);
+    }
+  }, [conversationKey]);
+
+  return { messages, addMessage, updateMessage, clearMessages };
 }
