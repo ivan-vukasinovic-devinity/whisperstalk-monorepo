@@ -20,9 +20,20 @@ app = FastAPI(title=settings.app_name)
 
 logger = logging.getLogger(__name__)
 
+import os
+
+_cors_env = os.environ.get("CORS_ORIGINS", "")
+_cors_origins = [
+    "https://xwhispers.com",
+    "https://www.xwhispers.com",
+    "https://whale-app-6lk93.ondigitalocean.app",
+    "http://localhost:5173",
+    "http://localhost:3000",
+] + [o.strip() for o in _cors_env.split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origins_list,
+    allow_origins=list(set(_cors_origins)),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
